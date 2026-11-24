@@ -232,6 +232,10 @@ def _persist(db: Session, run: TestRun, case: CaseData, b: Observation | None, c
     detail = res.as_dict()
     detail["requested_amount"] = case.input.get("requested_amount") if isinstance(case.input, dict) else None
     detail["scenario_faults"] = fault_label
+    detail["reason_codes"] = {
+        "baseline": (b.normalized or {}).get("reason_codes") if b else None,
+        "candidate": (c.normalized or {}).get("reason_codes") if c else None,
+    }
     detail["output_hashes"] = {
         "baseline": content_hash(b.normalized) if b and b.normalized else None,
         "candidate": content_hash(c.normalized) if c and c.normalized else None,

@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>ModelAssure release assurance report — run #{{ r.run.run_number }}</title>
+<style>
+  @page { size: A4; margin: 18mm 16mm 20mm 16mm;
+          @bottom-left { content: "ModelAssure · Run #{{ r.run.run_number }} · Report v{{ r.report_version }} · Confidential"; font-size: 8pt; color: #666; }
+          @bottom-right { content: "Page " counter(page) " of " counter(pages); font-size: 8pt; color: #666; } }
+  body { font-family: "DejaVu Sans", Arial, sans-serif; font-size: 9.5pt; color: #1c2430; line-height: 1.4; }
+  h1 { font-size: 18pt; margin: 0 0 2mm; color: #0b2545; }
+  h2 { font-size: 12.5pt; color: #0b2545; border-bottom: 1.5px solid #0b2545; padding-bottom: 1mm; margin: 7mm 0 3mm; }
+  h3 { font-size: 10.5pt; margin: 4mm 0 2mm; }
+  .muted { color: #5b6573; }
+  .badge { display: inline-block; padding: 1mm 3mm; border-radius: 2mm; font-weight: bold; color: #fff; }
+  .PASS { background: #1b7f3b; } .FAIL { background: #b42318; } .INCONCLUSIVE { background: #b54708; }
+  .sev-CRITICAL { color: #b42318; font-weight: bold; } .sev-HIGH { color: #c4320a; font-weight: bold; }
+  .sev-MEDIUM { color: #b54708; } .sev-LOW { color: #475467; }
+  table { width: 100%; border-collapse: collapse; margin: 2mm 0 3mm; font-size: 8.5pt; }
+  th { background: #eef2f6; text-align: left; padding: 1.5mm 2mm; border-bottom: 1px solid #c9d1db; }
+  td { padding: 1.5mm 2mm; border-bottom: 1px solid #e4e8ee; vertical-align: top; }
+  .kpis { display: flex; gap: 3mm; margin: 3mm 0; }
+  .kpi { flex: 1; border: 1px solid #d0d7e2; border-radius: 2mm; padding: 2mm 3mm; }
+  .kpi b { display: block; font-size: 14pt; }
+  .box { border: 1px solid #d0d7e2; border-left: 4px solid #0b2545; padding: 2mm 3mm; margin: 2mm 0; background: #f8fafc; }
+  .mono { font-family: "DejaVu Sans Mono", monospace; font-size: 7.5pt; word-break: break-all; }
+  ul { margin: 1mm 0 2mm 5mm; padding: 0; }
+</style>
+</head>
+<body>
+{% set es = r.executive_summary %}
+<p class="muted">MODELASSURE RELEASEGATE · RELEASE ASSURANCE REPORT</p>
+<h1>{{ es.project }}</h1>
+<p>Baseline <b>{{ es.baseline_version }}</b> → candidate <b>{{ es.candidate_version }}</b> · Run #{{ r.run.run_number }} ({{ r.run.scope }}) ·
+   Report version {{ r.report_version }} · Generated {{ r.generated_at[:19] }} UTC by {{ r.generated_by }}</p>
+
+<h2>1. Executive summary</h2>
+<p>Assessment: <span class="badge {{ es.assessment }}">{{ es.assessment }}</span> &nbsp; {{ es.recommendation }}</p>
+<div class="kpis">
+  <div class="kpi"><b>{{ es.cases_executed }}</b>cases executed</div>
+  <div class="kpi"><b>{{ es.results.FAIL }}</b>failed</div>
+  <div class="kpi"><b>{{ es.results.CHANGED }}</b>changed</div>
+  <div class="kpi"><b>{{ es.results.ERROR }}</b>technical errors</div>
+  <div class="kpi"><b>{{ es.results.INCONCLUSIVE }}</b>inconclusive</div>
+  <div class="kpi"><b>{{ es.critical_findings|length }}</b>critical findings</div>
+</div>
+{% if r.review.assessment.fail_reasons %}<h3>Why the assessment failed</h3><ul>{% for x in r.review.assessment.fail_reasons %}<li>{{ x }}</li>{% endfor %}</ul>{% endif %}
+{% if r.review.assessment.inconclusive_reasons %}<h3>Evidence gaps</h3><ul>{% for x in r.review.assessment.inconclusive_reasons %}<li>{{ x }}</li>{% endfor %}</ul>{% endif %}
+{% if r.review.assessment.flags %}<h3>Flagged for review</h3><ul>{% for x in r.review.assessment.flags %}<li>{{ x }}</li>{% endfor %}</ul>{% endif %}
+<div class="box">{{ es.disclaimer }}</div>
+
+<h2>2. Test methodology</h2>
+{% set m = r.methodology %}
+<p>{{ m.scenario_design }}</p>
+<table>
+  <tr><th>Suite</th><td>{{ m.suite.name }} v{{ m.suite.version }} · {{ m.suite.case_count }} cases · hash <span class="mono">{{ m.suite.content_hash }}</span></td></tr>
+  <tr><th>Candidate policy</th><td>{{ m.policy_sets.candidate.name }} v{{ m.policy_sets.candidate.version }} ({{ m.policy_sets.candidate.label }}) — {{ m.policy_sets.candidate.approval_status }}</td></tr>
+  <tr><th>Baseline policy</th><td>{{ m.policy_sets.baseline.name }} v{{ m.policy_sets.baseline.version }} ({{ m.policy_sets.baseline.label }}) — {{ m.policy_sets.baseline.approval_status }}</td></tr>
+  {% for side, c in m.execution_environment.items() %}
+  <tr><th>{{ side|capitalize }} endpoint</th><td>{{ c.version }} · {{ c.kind }} · <span class="mono">{{ c.endpoint }}</span> · timeout {{ c.timeout_ms }} ms · concurrency {{ c.max_concurrency }}</td></tr>
+  {% endfor %}
+  <tr><th>Mode</th><td>{{ m.mode }} · {{ m.platform_version }}</td></tr>
+  <tr><th>Result states</th><td>{{ m.result_states }}</td></tr>
+</table>
+
+<h2>3. Coverage</h2>
+<table>
+  <tr><th>Category</th><th>Total</th><th>Pass</th><th>Fail</th><th>Changed</th><th>Error</th><th>Inconclusive</th><th>Skipped</th></tr>
+  {% for c in r.coverage.by_category %}
+  <tr><td>{{ c.category }}</td><td>{{ c.total }}</td><td>{{ c.pass }}</td><td>{{ c.fail }}</td><td>{{ c.changed }}</td><td>{{ c.error }}</td><td>{{ c.inconclusive }}</td><td>{{ c.skipped }}</td></tr>
+  {% endfor %}
+</table>
+
+<h2>4. Decision changes</h2>
+{% set d = r.decision_changes %}
+<p>Decision agreement between versions: <b>{{ "%.1f"|format((d.agreement_rate or 0) * 100) }}%</b>. <span class="muted">{{ d.agreement_note }}</span></p>
+<p>Changes: {{ d.classification.total }} total — {{ d.classification.expected }} expected (approved change or policy revision),
+   {{ d.classification.unexpected }} unexpected, {{ d.classification.prohibited }} prohibited, {{ d.classification.with_violation }} accompanied by a policy violation.</p>
+<table>
+  <tr><th>Baseline ↓ / Candidate →</th>{% for c in ["APPROVE","REFER","REVIEW","HOLD","DECLINE"] %}<th>{{ c }}</th>{% endfor %}</tr>
+  {% for b in ["APPROVE","REFER","REVIEW","HOLD","DECLINE"] %}
+  <tr><th>{{ b }}</th>{% for c in ["APPROVE","REFER","REVIEW","HOLD","DECLINE"] %}<td>{{ d.transition_matrix.get(b, {}).get(c, "") }}</td>{% endfor %}</tr>
+  {% endfor %}
+</table>
+{% if d.unexpected_change_groups %}<h3>Unexpected changes requiring investigation</h3>
+<table><tr><th>Finding</th><th>Change</th><th>Cases</th><th>Status</th></tr>
+{% for g in d.unexpected_change_groups %}<tr><td>{{ g.finding }}</td><td>{{ g.title }}</td><td>{{ g.cases }}</td><td>{{ g.status }}</td></tr>{% endfor %}</table>{% endif %}
+{% if d.dependency_behaviour %}<h3>Behaviour under dependency failures</h3>
+<table><tr><th>Injected fault</th><th>Cases</th><th>Baseline decisions</th><th>Candidate decisions</th><th>Failed</th></tr>
+{% for x in d.dependency_behaviour %}<tr><td>{{ x.fault }}</td><td>{{ x.cases }}</td><td>{{ x.baseline_decisions }}</td><td>{{ x.candidate_decisions }}</td><td>{{ x.failed }}</td></tr>{% endfor %}</table>{% endif %}
+
+<h2>5. Policy violations</h2>
+{% if not r.policy_violations %}<p>No policy violations were found.</p>{% endif %}
+{% for v in r.policy_violations %}
+<h3>{{ v.finding }} · <span class="sev-{{ v.severity }}">{{ v.severity }}</span> · {{ v.title }}</h3>
+<table>
+  <tr><th>Rules</th><td>{{ v.rules|join(", ") }}</td><th>Status</th><td>{{ v.status }}</td></tr>
+  <tr><th>Affected cases</th><td>{{ v.affected_cases }}</td><th>Expected</th><td>{{ v.expected }}</td></tr>
+  <tr><th>Observed</th><td colspan="3">{{ v.observed }}</td></tr>
+  <tr><th>Reproduce with</th><td colspan="3" class="mono">{{ v.reproducible_cases|join(", ") }}</td></tr>
+  {% if v.suspected_cause %}<tr><th>Suspected cause</th><td colspan="3">{{ v.suspected_cause }}</td></tr>{% endif %}
+</table>
+{% endfor %}
+
+<h2>6. Financial implications</h2>
+<p>{{ r.financial_implications.statement }}</p>
+<p class="muted">Exposure indicators (synthetic cases): newly auto-approved requested amount MYR {{ "{:,.0f}".format(r.financial_implications.exposure_indicators.newly_approved_amount or 0) }};
+no longer auto-approved MYR {{ "{:,.0f}".format(r.financial_implications.exposure_indicators.no_longer_approved_amount or 0) }}. {{ r.financial_implications.exposure_indicators.note }}</p>
+
+<h2>7. Limitations</h2>
+<ul>{% for x in r.limitations %}<li>{{ x }}</li>{% endfor %}</ul>
+
+<h2>8. Remediation</h2>
+<table><tr><th>Finding</th><th>Severity</th><th>Status</th><th>Owner</th><th>Retest evidence</th></tr>
+{% for f in r.remediation %}
+<tr><td>{{ f.finding }} — {{ f.title }}</td><td class="sev-{{ f.severity }}">{{ f.severity }}</td><td>{{ f.status }}</td><td>{{ f.owner or "—" }}</td>
+<td>{% for h in f.retest_history %}Run #{{ h.run_number }} on {{ h.candidate_version }}: {{ "passed" if h.passed else "still failing" }}<br>{% endfor %}
+{% if f.risk_acceptance and f.status == "ACCEPTED_RISK" %}Risk accepted by {{ f.risk_acceptance.authorised_by }}, owner {{ f.risk_acceptance.owner_email }}: {{ f.risk_acceptance.rationale }}{% endif %}</td></tr>
+{% endfor %}</table>
+{% if r.retest_runs %}<p>Retest runs: {% for x in r.retest_runs %}#{{ x.run_number }} ({{ x.scope }}, {{ x.candidate }}, {{ x.assessment }}){% if not loop.last %}; {% endif %}{% endfor %}</p>{% endif %}
+
+<h2>9. Review</h2>
+{% if not r.review.decisions %}<p>No reviewer decision has been recorded.</p>{% endif %}
+<table>{% for x in r.review.decisions %}<tr><td>{{ x.at[:19] }}</td><td>{{ x.reviewer }}</td><td><b>{{ x.decision }}</b> (assessment {{ x.assessment_at_review }})</td><td>{{ x.rationale }}</td></tr>{% endfor %}</table>
+<div class="box">{{ r.review.authority }}</div>
+
+<h2>Evidence integrity</h2>
+<table>
+  <tr><th>Run configuration hash</th><td class="mono">{{ r.run.snapshot_hash }}</td></tr>
+  <tr><th>Results digest</th><td class="mono">{{ r.results_digest }}</td></tr>
+  <tr><th>Run ID</th><td class="mono">{{ r.run.id }}</td></tr>
+</table>
+</body>
+</html>

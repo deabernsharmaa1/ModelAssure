@@ -22,17 +22,17 @@ def create_app() -> FastAPI:
 
     from modules.audit.router import router as audit_router
     from modules.connectors.router import router as connections_router
+    from modules.findings.router import router as findings_router
     from modules.identity.router import router as identity_router
+    from modules.policies.router import router as policies_router
     from modules.projects.router import router as projects_router
+    from modules.reports.router import router as reports_router
+    from modules.runner.router import router as runs_router
+    from modules.scenarios.router import router as scenarios_router
 
-    for r in (identity_router, projects_router, connections_router, audit_router):
+    for r in (identity_router, projects_router, connections_router, policies_router, scenarios_router,
+              runs_router, findings_router, reports_router, audit_router):
         app.include_router(r)
-    try:  # later phases register more routers
-        from modules.registry import extra_routers
-        for r in extra_routers():
-            app.include_router(r)
-    except ImportError:
-        pass
 
     @app.get("/health", tags=["system"])
     def health() -> dict:

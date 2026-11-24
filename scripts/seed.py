@@ -30,6 +30,8 @@ ORGS = {
         ("analyst@tanjung.example", "Hafiz Ismail", ["ANALYST"]),
         ("reviewer@tanjung.example", "Mei Ling Tan", ["REVIEWER"]),
         ("auditor@tanjung.example", "Farid Osman", ["AUDITOR"]),
+        # Holds two roles: used to demonstrate that a builder of a release cannot approve it.
+        ("lead@tanjung.example", "Ravi Kumar", ["ENGINEER", "REVIEWER"]),
     ],
     "Other Lender Sdn Bhd": [
         ("admin@otherlender.example", "Siti Aminah", ["ADMIN", "RISK_MANAGER", "ANALYST"]),
