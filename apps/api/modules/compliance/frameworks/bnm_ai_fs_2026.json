@@ -1,0 +1,90 @@
+{
+  "framework_id": "BNM-AI-FS-2026",
+  "name": "BNM Feedback Statement: AI in the Malaysian Financial Sector",
+  "issuer": "Bank Negara Malaysia",
+  "published": "2026-11-19",
+  "status": "PUBLISHED",
+  "jurisdiction": "MY",
+  "nature": "Supervisory feedback statement. BNM is not introducing AI-specific regulation at this stage; existing policy documents (RMiT, Outsourcing, Corporate Governance and others) continue to apply.",
+  "source_url": "https://www.bnm.gov.my/documents/20124/938039/fs-ai-fs.pdf",
+  "controls": [
+    {
+      "control_id": "FS-17-TEST",
+      "reference": "p.17",
+      "topic": "Pre-deployment testing",
+      "expectation": "Assess risks before deployment; test and validate models; maintain human oversight.",
+      "checks": [
+        "suite_executed_full",
+        "edge_and_negative_cases",
+        "customer_protection_rules"
+      ],
+      "max_coverage": "FULL"
+    },
+    {
+      "control_id": "FS-18-VALIDATION",
+      "reference": "p.18",
+      "topic": "Proportionate, independent validation",
+      "expectation": "Models that materially influence customer outcomes, such as credit underwriting, warrant more comprehensive testing and independent validation.",
+      "checks": [
+        "suite_executed_full",
+        "independent_review",
+        "approved_policies_four_eyes"
+      ],
+      "max_coverage": "PARTIAL",
+      "note": "ModelAssure validates decision behaviour against approved policies. Statistical validation (accuracy, calibration, stability) needs labelled outcomes and is a Phase 2 capability."
+    },
+    {
+      "control_id": "FS-20-CONSUMER",
+      "reference": "p.20",
+      "topic": "Validate consumer-facing AI before deployment",
+      "expectation": "Validate AI-enabled products and recommendations before deployment; institutions remain accountable for AI-driven decisions and outcomes.",
+      "checks": [
+        "customer_protection_rules",
+        "human_oversight"
+      ],
+      "max_coverage": "FULL"
+    },
+    {
+      "control_id": "FS-20-FAIRNESS",
+      "reference": "p.20",
+      "topic": "Fairness and bias",
+      "expectation": "Monitor for biased or unfair outcomes and maintain strong data governance.",
+      "checks": [],
+      "max_coverage": "NONE",
+      "note": "Not assessed by Version 1. Requires approved group-level metrics and appropriate data (Phase 2)."
+    },
+    {
+      "control_id": "FS-6-THIRDPARTY",
+      "reference": "p.6, p.23",
+      "topic": "Third-party dependency",
+      "expectation": "Manage third-party and concentration risk, including limited visibility into vendor practices and embedded AI.",
+      "checks": [
+        "regression_vs_baseline",
+        "dependency_faults",
+        "version_traceability"
+      ],
+      "max_coverage": "PARTIAL",
+      "note": "Covers behavioural testing of vendor releases and dependency failures. Vendor due diligence, contracts and concentration risk are outside ModelAssure."
+    },
+    {
+      "control_id": "FS-15-ACCOUNTABILITY",
+      "reference": "p.15, p.17",
+      "topic": "Accountability and human oversight",
+      "expectation": "Existing accountability requirements apply to AI-supported decisions; boards challenge material AI uses and management is accountable for outcomes.",
+      "checks": [
+        "human_oversight",
+        "findings_remediated"
+      ],
+      "max_coverage": "FULL"
+    },
+    {
+      "control_id": "FS-21-MONITORING",
+      "reference": "p.21",
+      "topic": "Ongoing monitoring",
+      "expectation": "Monitor AI systems on an ongoing basis to detect unintended outcomes.",
+      "checks": [],
+      "max_coverage": "NONE",
+      "note": "Version 1 tests releases before deployment; production monitoring is a later capability."
+    }
+  ]
+}

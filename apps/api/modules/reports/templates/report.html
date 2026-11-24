@@ -25,6 +25,8 @@
   .box { border: 1px solid #d0d7e2; border-left: 4px solid #0b2545; padding: 2mm 3mm; margin: 2mm 0; background: #f8fafc; }
   .mono { font-family: "DejaVu Sans Mono", monospace; font-size: 7.5pt; word-break: break-all; }
   ul { margin: 1mm 0 2mm 5mm; padding: 0; }
+  .st-MET { color: #1b7f3b; font-weight: bold; } .st-PARTIAL { color: #b54708; font-weight: bold; }
+  .st-NOT_MET { color: #b42318; font-weight: bold; } .st-NO_EVIDENCE { color: #475467; font-weight: bold; } .st-OUT_OF_SCOPE { color: #98a2b3; }
 </style>
 </head>
 <body>
@@ -123,6 +125,19 @@ no longer auto-approved MYR {{ "{:,.0f}".format(r.financial_implications.exposur
 {% if not r.review.decisions %}<p>No reviewer decision has been recorded.</p>{% endif %}
 <table>{% for x in r.review.decisions %}<tr><td>{{ x.at[:19] }}</td><td>{{ x.reviewer }}</td><td><b>{{ x.decision }}</b> (assessment {{ x.assessment_at_review }})</td><td>{{ x.rationale }}</td></tr>{% endfor %}</table>
 <div class="box">{{ r.review.authority }}</div>
+
+<h2>10. Regulatory mapping</h2>
+<p class="muted">{{ r.regulatory_mapping.disclaimer }}</p>
+{% for f in r.regulatory_mapping.frameworks %}
+<h3>{{ f.name }} <span class="muted">({{ f.issuer }}; {{ f.status|replace("_", " ")|lower }})</span></h3>
+<p class="muted">{{ f.nature }}{% if f.reference_note %} {{ f.reference_note }}{% endif %}</p>
+{% if not f.controls %}<p>Controls will be mapped when this framework is published.</p>{% else %}
+<table><tr><th style="width:14%">Reference</th><th style="width:22%">Expectation</th><th style="width:12%">Status</th><th>Evidence from this run</th></tr>
+{% for c in f.controls %}
+<tr><td>{{ c.reference }}</td><td>{{ c.topic }}</td><td class="st-{{ c.status }}">{{ c.status|replace("_", " ") }}</td>
+<td>{% for e in c.evidence %}{{ e }}<br>{% endfor %}{% if c.note %}<span class="muted">{{ c.note }}</span>{% endif %}</td></tr>
+{% endfor %}</table>{% endif %}
+{% endfor %}
 
 <h2>Evidence integrity</h2>
 <table>

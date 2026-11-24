@@ -116,3 +116,14 @@ export interface Finding {
 export interface Review { id: string; decision: string; rationale: string; created_at: string; reviewer: { name: string; email: string } | null; assessment_snapshot: Assessment }
 export interface ArtifactRow { id: string; type: string; version: number; checksum: string; size_bytes: number; created_at: string; metadata: Record<string, unknown> }
 export interface AuditEvent { id: string; seq: number; actor_label: string; action: string; resource_type: string; resource_id: string | null; outcome: string; details: Record<string, unknown>; timestamp: string; hash: string }
+
+export interface ComplianceControl {
+  control_id: string; reference: string; topic: string; expectation: string; max_coverage: string; note?: string;
+  status: "MET" | "PARTIAL" | "NOT_MET" | "NO_EVIDENCE" | "OUT_OF_SCOPE";
+  checks: { check: string; status: string; detail: string }[];
+}
+export interface ComplianceFramework {
+  framework_id: string; name: string; issuer: string; published: string | null; status: string; jurisdiction: string;
+  nature: string; source_url: string; reference_note?: string; summary: Record<string, number>; controls: ComplianceControl[];
+}
+export interface ComplianceResult { run_id: string; run_number: number; disclaimer: string; frameworks: ComplianceFramework[] }

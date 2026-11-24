@@ -134,6 +134,7 @@ def build_report(db: Session, run: TestRun, version: int, generated_by: str) -> 
         "retest_runs": [{"run_number": r.run_number, "scope": r.scope, "status": r.status,
                          "candidate": r.config_snapshot["versions"]["candidate"]["version"],
                          "assessment": (r.assessment or {}).get("outcome")} for r in retest_runs],
+        "regulatory_mapping": _mapping_summary(db, run),
         "review": {
             "assessment": assessment,
             "decisions": [{"decision": r.decision, "rationale": r.rationale, "at": r.created_at.isoformat(),
@@ -148,3 +149,15 @@ def next_report_version(db: Session, run: TestRun) -> int:
     from db.models import Artifact
 
     return (db.scalar(select(func.max(Artifact.version)).where(Artifact.run_id == run.id, Artifact.type == "REPORT_JSON")) or 0) + 1
+
+
+def _mapping_summary(db: Session, run: TestRun) -> dict[str, Any]:
+    from modules.compliance.mapping import evaluate
+
+    m = evaluate(db, run)
+    return {"disclaimer": m["disclaimer"], "frameworks": [{
+        "framework_id": f["framework_id"], "name": f["name"], "issuer": f["issuer"], "status": f["status"],
+        "nature": f["nature"], "reference_note": f.get("reference_note"), "summary": f["summary"],
+        "controls": [{"control_id": c["control_id"], "reference": c["reference"], "topic": c["topic"], "status": c["status"],
+                      "evidence": [x["detail"] for x in c["checks"]], "note": c.get("note")} for c in f["controls"]],
+    } for f in m["frameworks"]]}

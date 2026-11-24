@@ -20,7 +20,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from db.models import Finding, TestRun
-from modules.findings.grouping import FAILING_TYPES, UNRESOLVED
+from modules.findings.grouping import FAILING_TYPES, UNRESOLVED, open_for_build
 from modules.policies.policy_set import DEFAULT_RELEASE_CRITERIA
 
 DISCLAIMER = ("A PASS means the defined tests passed under the stated configuration. It is not a statement that the "
@@ -39,16 +39,15 @@ def assess_run(db: Session, run: TestRun) -> dict[str, Any]:
 
     this_version = snap["versions"]["candidate"]["version"]
     for f in findings:
-        if f.type not in FAILING_TYPES or f.severity not in fail_on:
+        if f.type not in FAILING_TYPES or f.severity not in fail_on or not open_for_build(f, this_version):
             continue
         if f.status in UNRESOLVED:
             fail_reasons.append(f"Unresolved {f.severity} finding F-{f.finding_number}: {f.title} ({f.affected_count} cases)")
-        elif f.status in ("RESOLVED", "CLOSED") and not (f.closure or {}).get("reason") == "FALSE_POSITIVE":
+        else:
             # A fix verified on another build does not make THIS build releasable.
             fixed_in = [h["candidate_version"] for h in f.retest_history if h.get("passed")]
-            if fixed_in and this_version not in fixed_in:
-                fail_reasons.append(f"F-{f.finding_number} was fixed in {fixed_in[-1]}, but this run's candidate "
-                                    f"{this_version} still contains it. Assess a full run of {fixed_in[-1]} instead.")
+            fail_reasons.append(f"F-{f.finding_number} was fixed in {fixed_in[-1]}, but this run's candidate "
+                                f"{this_version} still contains it. Assess a full run of {fixed_in[-1]} instead.")
 
     if run.status != "COMPLETED":
         inconclusive_reasons.append(f"Run is {run.status}; the evidence is incomplete.")

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useParams, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
+import { RegulatoryMapping } from "@/components/RegulatoryMapping";
 import { Badge, Button, Card, Empty, ErrorBox, Field, Loading, Mono, OutcomeBanner, PageHeader, Select, Table, Td, inputCls, useApi } from "@/components/ui";
 import { ApiError, api, download } from "@/lib/api";
 import { CAN, useAuth } from "@/lib/auth";
@@ -67,6 +68,8 @@ function ReleaseInner() {
                 </div>
               )}
             </Card>
+
+            <RegulatoryMapping runId={run.id} />
 
             <Card title={`Outstanding findings (${outstanding.length})`} pad={false}>
               <Table head={["Finding", "Severity", "Status", "Owner", "Cases"]} empty={!outstanding.length && <div className="p-4"><Empty>No unresolved findings.</Empty></div>}>

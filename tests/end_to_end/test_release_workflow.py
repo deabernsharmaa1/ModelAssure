@@ -210,6 +210,39 @@ def test_audit_chain_still_valid_after_full_workflow(api):
     assert api.as_("auditor").get("/v1/audit-events/verify").json()["valid"] is True
 
 
+def _controls(api, run_id):
+    m = api.as_("risk").get(f"/v1/runs/{run_id}/compliance").json()
+    return {c["control_id"]: c for f in m["frameworks"] for c in f["controls"]}, m
+
+
+def test_regulatory_mapping_on_defective_release(api, flow):
+    c, m = _controls(api, flow["run"]["id"])
+    assert "not a legal or compliance opinion" in m["disclaimer"]
+    assert c["RMIT-10.8"]["status"] == "MET"                       # rigorous testing happened
+    assert c["FS-17-TEST"]["status"] == "NOT_MET"                  # ...and it shows unresolved violations
+    assert c["FS-20-FAIRNESS"]["status"] == "OUT_OF_SCOPE"
+    assert c["FS-18-VALIDATION"]["status"] in ("PARTIAL", "NOT_MET")  # never MET: statistical validation not covered
+    dep = next(x for x in c["RMIT-10.9"]["checks"] if x["check"] == "dependency_faults")
+    assert dep["status"] in ("NOT_MET", "PARTIAL")
+
+
+def test_regulatory_mapping_on_approved_release(api, fixed_full):
+    c, _ = _controls(api, fixed_full["id"])
+    assert c["RMIT-10.11"]["status"] == "MET"                      # independent review + four-eyes policies
+    assert c["MAS-5.18"]["status"] == "MET"
+    assert c["FS-18-VALIDATION"]["status"] == "PARTIAL"            # capped: ModelAssure covers part of it
+    assert c["RMIT-10.57c"]["status"] == "MET"
+    assert c["FS-17-TEST"]["status"] == "MET"
+
+
+def test_regulatory_mapping_in_report_and_unknown_framework(api, fixed_full):
+    rep = api.as_("risk").get(f"/v1/runs/{fixed_full['id']}/report").json()
+    ids = [f["framework_id"] for f in rep["regulatory_mapping"]["frameworks"]]
+    assert "BNM-AI-FS-2026" in ids and "MAS-AIRM-2026" in ids
+    r = api.as_("risk").get(f"/v1/runs/{fixed_full['id']}/compliance", params={"framework": "EU-AI-ACT"})
+    assert r.status_code == 422
+
+
 def test_retention_purge_keeps_outcomes_and_hashes(api, flow, database):
     """Spec §12.2: raw records have limited retention; outcomes and hashes remain provable."""
     from datetime import datetime, timedelta, timezone

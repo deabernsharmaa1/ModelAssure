@@ -107,6 +107,8 @@ const BADGE: Record<string, string> = {
   CLOSED: "bg-slate-100 text-slate-600 ring-slate-500/20", EXPECTED: "bg-sky-100 text-sky-800 ring-sky-600/20",
   UNEXPECTED: "bg-amber-100 text-amber-900 ring-amber-600/30", PROHIBITED: "bg-red-100 text-red-800 ring-red-600/20",
   VIOLATION: "bg-red-100 text-red-800 ring-red-600/20",
+  MET: "bg-green-100 text-green-800 ring-green-600/20", NOT_MET: "bg-red-100 text-red-800 ring-red-600/20",
+  NO_EVIDENCE: "bg-slate-100 text-slate-700 ring-slate-500/20", OUT_OF_SCOPE: "bg-white text-slate-500 ring-slate-300",
 };
 
 export function Badge({ value, label }: { value: string | null | undefined; label?: string }) {

@@ -1,0 +1,107 @@
+{
+  "framework_id": "MAS-AIRM-2026",
+  "name": "MAS Guidelines on Artificial Intelligence Risk Management",
+  "issuer": "Monetary Authority of Singapore",
+  "published": "2026-10-07",
+  "status": "PUBLISHED_NOT_YET_EFFECTIVE",
+  "jurisdiction": "SG",
+  "nature": "Guidelines. Effective 7 October 2027; Section 5 (life-cycle controls) and Section 6 expectations by 7 October 2028.",
+  "source_url": "https://www.mas.gov.sg/regulation/guidelines/guidelines-on-artificial-intelligence-risk-management-for-financial-institutions",
+  "controls": [
+    {
+      "control_id": "MAS-5.10",
+      "reference": "5.10-5.11",
+      "topic": "Third-party AI",
+      "expectation": "The institution keeps primary accountability for third-party AI and tests it in its own context.",
+      "checks": [
+        "regression_vs_baseline",
+        "suite_executed_full",
+        "dependency_faults"
+      ],
+      "max_coverage": "PARTIAL",
+      "note": "Covers testing in the institution's context; transparency, supply-chain and contract assessments are outside ModelAssure."
+    },
+    {
+      "control_id": "MAS-5.14",
+      "reference": "5.14-5.15",
+      "topic": "Evaluation and testing",
+      "expectation": "Test against measurable thresholds under plausible conditions, including edge cases.",
+      "checks": [
+        "edge_and_negative_cases",
+        "customer_protection_rules"
+      ],
+      "max_coverage": "FULL"
+    },
+    {
+      "control_id": "MAS-5.18",
+      "reference": "5.18-5.21",
+      "topic": "Independent pre-deployment review",
+      "expectation": "Pre-deployment reviews are performed by parties not involved in development; high-materiality uses need formal independent validation.",
+      "checks": [
+        "independent_review"
+      ],
+      "max_coverage": "FULL"
+    },
+    {
+      "control_id": "MAS-5.25",
+      "reference": "5.25",
+      "topic": "Change management",
+      "expectation": "Classify the significance of changes, re-approve significant ones, and keep version tracking and rollback.",
+      "checks": [
+        "version_traceability",
+        "regression_vs_baseline",
+        "human_oversight"
+      ],
+      "max_coverage": "PARTIAL",
+      "note": "Rollback and decommissioning are operated by the institution."
+    },
+    {
+      "control_id": "MAS-5.17",
+      "reference": "5.17",
+      "topic": "Documentation",
+      "expectation": "Document in enough detail for an independent party to understand and replicate results.",
+      "checks": [
+        "version_traceability",
+        "audit_trail"
+      ],
+      "max_coverage": "FULL"
+    },
+    {
+      "control_id": "MAS-5.9",
+      "reference": "5.9",
+      "topic": "Human oversight",
+      "expectation": "Define roles, escalation and authority; keep records of interventions.",
+      "checks": [
+        "human_oversight"
+      ],
+      "max_coverage": "FULL"
+    },
+    {
+      "control_id": "MAS-5.7",
+      "reference": "5.7-5.8",
+      "topic": "Fairness",
+      "expectation": "Define fairness, assess protected attributes and proxies, and document mitigations.",
+      "checks": [],
+      "max_coverage": "NONE",
+      "note": "Not assessed by Version 1 (Phase 2)."
+    },
+    {
+      "control_id": "MAS-5.5",
+      "reference": "5.5-5.6",
+      "topic": "Explainability",
+      "expectation": "Scale explainability to materiality; credit decisions need more.",
+      "checks": [],
+      "max_coverage": "NONE",
+      "note": "Reason codes are captured as evidence but not assessed for adequacy."
+    },
+    {
+      "control_id": "MAS-5.23",
+      "reference": "5.23-5.24",
+      "topic": "Post-deployment monitoring",
+      "expectation": "Track metrics and drift; manage incidents.",
+      "checks": [],
+      "max_coverage": "NONE",
+      "note": "Production monitoring is a later capability."
+    }
+  ]
+}

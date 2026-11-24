@@ -1,0 +1,81 @@
+{
+  "framework_id": "BNM-RMIT-2026",
+  "name": "BNM Risk Management in Technology (RMiT)",
+  "issuer": "Bank Negara Malaysia",
+  "published": "2026-09-25",
+  "status": "IN_FORCE",
+  "jurisdiction": "MY",
+  "nature": "Binding policy document. 'S' paragraphs are standards; 'G' paragraphs are guidance.",
+  "source_url": "https://www.bnm.gov.my/documents/20124/938039/pd-rmit-sep26.pdf",
+  "reference_note": "Paragraph numbers were read from the September 2026 revision. Confirm against your institution's copy before citing them to a supervisor.",
+  "controls": [
+    {
+      "control_id": "RMIT-10.8",
+      "reference": "S 10.8",
+      "topic": "Rigorous testing before deployment",
+      "expectation": "Conduct rigorous system testing prior to deployment.",
+      "checks": [
+        "suite_executed_full"
+      ],
+      "max_coverage": "FULL"
+    },
+    {
+      "control_id": "RMIT-10.9",
+      "reference": "G 10.9",
+      "topic": "Testing scope",
+      "expectation": "Testing scope should include regression, exception and negative testing.",
+      "checks": [
+        "regression_vs_baseline",
+        "edge_and_negative_cases",
+        "invalid_input_safe",
+        "dependency_faults"
+      ],
+      "max_coverage": "FULL"
+    },
+    {
+      "control_id": "RMIT-10.11",
+      "reference": "S 10.11",
+      "topic": "Independent review and approval of changes",
+      "expectation": "System changes are independently reviewed and approved.",
+      "checks": [
+        "independent_review",
+        "approved_policies_four_eyes"
+      ],
+      "max_coverage": "FULL"
+    },
+    {
+      "control_id": "RMIT-10.12a",
+      "reference": "S 10.12(a)",
+      "topic": "Changes to third-party-developed critical systems",
+      "expectation": "Third-party developers give sufficient notice before changes to critical systems.",
+      "checks": [
+        "version_traceability"
+      ],
+      "max_coverage": "PARTIAL",
+      "note": "ModelAssure records and verifies which vendor build was tested. The contractual notice requirement is outside its scope."
+    },
+    {
+      "control_id": "RMIT-10.46",
+      "reference": "S 10.46",
+      "topic": "Accountability for third-party risk",
+      "expectation": "The institution remains accountable for managing all risks from third-party service providers.",
+      "checks": [
+        "regression_vs_baseline",
+        "human_oversight"
+      ],
+      "max_coverage": "PARTIAL",
+      "note": "Provides independent behavioural evidence on a vendor's release; broader third-party due diligence (S 10.47) is separate."
+    },
+    {
+      "control_id": "RMIT-10.57c",
+      "reference": "S 10.57(c)",
+      "topic": "Audit logging",
+      "expectation": "User activities in critical systems are logged for audit and investigations; activity logs are kept for at least three years.",
+      "checks": [
+        "audit_trail"
+      ],
+      "max_coverage": "FULL",
+      "note": "Audit events are append-only and never purged by ModelAssure's evidence retention task. Keep the database backups for at least three years."
+    }
+  ]
+}

@@ -31,6 +31,19 @@ UNRESOLVED = {"OPEN", "INVESTIGATING", "FIX_PROPOSED", "READY_FOR_RETEST"}
 SEV_RANK = {s: i for i, s in enumerate(SEVERITIES)}  # CRITICAL=0 (most severe)
 
 
+def open_for_build(f: Finding, candidate_version: str) -> bool:
+    """Is this finding still a problem for the given candidate build?
+
+    A finding resolved by a passing retest on a *different* build is still open for the build that
+    was originally tested: the fix lives in the other build, not this one."""
+    if f.status in UNRESOLVED:
+        return True
+    if f.status in ("RESOLVED", "CLOSED") and (f.closure or {}).get("reason") != "FALSE_POSITIVE":
+        fixed_in = [h["candidate_version"] for h in f.retest_history if h.get("passed")]
+        return bool(fixed_in) and candidate_version not in fixed_in
+    return False
+
+
 def _max_sev(sevs) -> str:
     sevs = [s for s in sevs if s in SEV_RANK]
     return min(sevs, key=SEV_RANK.get) if sevs else "MEDIUM"

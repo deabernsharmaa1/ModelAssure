@@ -37,6 +37,7 @@ def create_app() -> FastAPI:
                        allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 
     from modules.audit.router import router as audit_router
+    from modules.compliance.router import router as compliance_router
     from modules.connectors.router import router as connections_router
     from modules.findings.router import router as findings_router
     from modules.identity.router import router as identity_router
@@ -47,7 +48,7 @@ def create_app() -> FastAPI:
     from modules.scenarios.router import router as scenarios_router
 
     for r in (identity_router, projects_router, connections_router, policies_router, scenarios_router,
-              runs_router, findings_router, reports_router, audit_router):
+              runs_router, findings_router, reports_router, compliance_router, audit_router):
         app.include_router(r)
 
     @app.get("/health", tags=["system"])
