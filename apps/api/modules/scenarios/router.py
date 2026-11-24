@@ -23,7 +23,7 @@ from modules.audit.service import record_for
 from modules.identity.auth import Principal, require
 from modules.policies.dsl import PolicyError
 from modules.policies.policy_set import compile_policy_set
-from modules.scenarios.generators import GenerationError, default_scenario, generate_suite
+from modules.scenarios.generators import GENERATOR_VERSION, GenerationError, default_scenario, generate_suite
 
 router = APIRouter(prefix="/v1", tags=["scenarios"])
 
@@ -189,7 +189,7 @@ def create_suite(body: SuiteIn, p: Principal = Depends(require("suite.create")),
     db.execute(text("SELECT pg_advisory_xact_lock(hashtextextended(:k, 0))"), {"k": f"suite:{body.project_id}:{body.name}"})
     version = (db.scalar(select(func.max(TestSuite.version)).where(TestSuite.project_id == body.project_id,
                                                                    TestSuite.name == body.name)) or 0) + 1
-    config = {**body.config, "policy_set_ids": [str(i) for i in body.policy_set_ids],
+    config = {**body.config, "generator_version": GENERATOR_VERSION, "policy_set_ids": [str(i) for i in body.policy_set_ids],
               "historical_dataset_id": str(body.historical_dataset_id) if body.historical_dataset_id else None}
     suite = TestSuite(organization_id=p.org_id, project_id=body.project_id, name=body.name, version=version,
                       description=body.description, generator_config=config, seed=int(body.config.get("seed", 20261124)),

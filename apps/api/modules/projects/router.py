@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session
 from common.deps import get_or_404, row, tenant_db
 from common.errors import conflict, invalid
 from common.hashing import content_hash
-from db.models import Finding, Membership, Project, System, SystemVersion, TestRun
+from db.models import Connection, Finding, Membership, PolicySet, Project, Review, System, SystemVersion, TestRun, TestSuite
 from modules.audit.service import record_for
 from modules.identity.auth import Principal, require
 
@@ -23,7 +23,8 @@ router = APIRouter(prefix="/v1", tags=["projects"])
 # ---- systems & versions -----------------------------------------------------------------------
 class SystemIn(BaseModel):
     name: str = Field(min_length=1, max_length=200)
-    category: Literal["SME_LENDING_DECISION"] = "SME_LENDING_DECISION"  # Version 1 scope (spec §1.4)
+    # Version 1 scope is SME lending (spec §1.4); consumer credit / BNPL added for Consumer Credit Act lenders.
+    category: Literal["SME_LENDING_DECISION", "CONSUMER_CREDIT_DECISION"] = "SME_LENDING_DECISION"
     vendor: str | None = None
 
 
@@ -165,3 +166,48 @@ def update_project(project_id: str, body: ProjectPatch, p: Principal = Depends(r
     record_for(db, p, "project.update", "project", proj.id, {"before": before, "after": {k: str(v) for k, v in changes.items()}})
     db.commit()
     return row(proj)
+
+
+# ---- onboarding checklist -----------------------------------------------------------------------
+@router.get("/projects/{project_id}/setup")
+def setup_status(project_id: str, p: Principal = Depends(require("project.read")), db: Session = Depends(tenant_db)):
+    """Where this project stands on the path from creation to a release review, and what to do next."""
+    proj = get_or_404(db, Project, project_id, "project")
+
+    def conn_state(version_id):
+        if not version_id:
+            return "MISSING_VERSION"
+        statuses = set(db.scalars(select(Connection.status).where(Connection.system_version_id == version_id)))
+        return "VERIFIED" if "VERIFIED" in statuses else ("UNVERIFIED" if statuses else "NONE")
+
+    b_conn, c_conn = conn_state(proj.baseline_version_id), conn_state(proj.candidate_version_id)
+    ps_counts = dict(db.execute(select(PolicySet.approval_status, func.count()).where(PolicySet.project_id == proj.id)
+                                .group_by(PolicySet.approval_status)).all())
+    suites = db.scalar(select(func.count()).select_from(TestSuite).where(TestSuite.project_id == proj.id)) or 0
+    runs = db.scalar(select(func.count()).select_from(TestRun).where(TestRun.project_id == proj.id, TestRun.status == "COMPLETED")) or 0
+    reviews = db.scalar(select(func.count()).select_from(Review).join(TestRun, TestRun.id == Review.run_id)
+                        .where(TestRun.project_id == proj.id)) or 0
+    approved = ps_counts.get("APPROVED", 0)
+    pending = ps_counts.get("PENDING_REVIEW", 0)
+    steps = [
+        {"key": "versions", "title": "Register baseline and candidate versions", "role": "Engineer",
+         "done": bool(proj.baseline_version_id and proj.candidate_version_id),
+         "detail": "Both versions selected" if proj.baseline_version_id and proj.candidate_version_id else "Choose both versions in Project setup"},
+        {"key": "connections", "title": "Connect and verify both decision APIs", "role": "Engineer",
+         "done": b_conn == "VERIFIED" and c_conn == "VERIFIED",
+         "detail": f"Baseline: {b_conn.replace('_', ' ').lower()}, candidate: {c_conn.replace('_', ' ').lower()}. "
+                   "Use 'Suggest mapping' with sample payloads to draft the field mapping."},
+        {"key": "policies", "title": "Approve a policy set", "role": "Risk Manager",
+         "done": approved > 0,
+         "detail": (f"{approved} approved" if approved else
+                    f"{pending} waiting for approval" if pending else "Start from a policy template and enter your own thresholds")},
+        {"key": "suite", "title": "Generate a test suite", "role": "Analyst", "done": suites > 0,
+         "detail": f"{suites} suite(s)" if suites else "Generate cases from your approved policies"},
+        {"key": "run", "title": "Run baseline vs candidate", "role": "Engineer / Analyst", "done": runs > 0,
+         "detail": f"{runs} completed run(s)" if runs else "Queue a run from the Runs page"},
+        {"key": "review", "title": "Record a release review", "role": "Reviewer", "done": reviews > 0,
+         "detail": f"{reviews} review(s) recorded" if reviews else "A reviewer records the release decision on a completed run"},
+    ]
+    nxt = next((s for s in steps if not s["done"]), None)
+    return {"project_id": str(proj.id), "steps": steps, "completed": sum(s["done"] for s in steps), "total": len(steps),
+            "next_step": nxt["key"] if nxt else None}

@@ -156,7 +156,8 @@ def compile_policy_set(doc: dict[str, Any]) -> CompiledPolicySet:
     if not isinstance(doc, dict):
         raise PolicyError("policy set must be an object")
     allowed_keys = {"label", "parameters", "derived_fields", "policies", "change_controls",
-                    "expected_changes", "severity_rules", "release_criteria", "description"}
+                    "expected_changes", "severity_rules", "release_criteria", "description",
+                    "source_template"}  # informational provenance; never affects evaluation
     extra = set(doc) - allowed_keys
     if extra:
         raise PolicyError(f"unsupported top-level keys {sorted(extra)}")
@@ -271,7 +272,13 @@ def compile_policy_set(doc: dict[str, Any]) -> CompiledPolicySet:
         change_controls=change_controls, expected_changes=expected,
         severity_rules=sev_rules, release_criteria=criteria,
     )
-    cps.issues = _semantic_checks(cps, derived_names)
+    seen_issues, unique = set(), []
+    for i in _semantic_checks(cps, derived_names):
+        key = (i.level, i.code, i.message)
+        if key not in seen_issues:
+            seen_issues.add(key)
+            unique.append(i)
+    cps.issues = unique
     return cps
 
 
@@ -295,11 +302,17 @@ def _semantic_checks(cps: CompiledPolicySet, derived_names: set[str]) -> list[Is
             for ns, path in refs:
                 if ns == "params" and path[0] not in cps.parameters:
                     issues.append(Issue("error", "UNKNOWN_PARAMETER", f"{rid} references undefined parameter 'params.{path[0]}'", [rid]))
+                elif ns == "params" and cps.parameters.get(path[0]) is None:
+                    issues.append(Issue("error", "PARAMETER_NOT_SET",
+                                        f"{rid} needs a value for 'params.{path[0]}'. Thresholds must come from your approved policy.", [rid]))
                 if ns == "derived" and path[0] not in derived_names:
                     issues.append(Issue("error", "UNKNOWN_DERIVED_FIELD", f"{rid} references undefined derived field 'derived.{path[0]}'", [rid]))
             if leaf.value_ref and leaf.value_ref[0] == "params" and leaf.value_ref[1][0] in cps.parameters:
                 pv = cps.parameters[leaf.value_ref[1][0]]
-                if leaf.operator in ("gt", "gte", "lt", "lte") and not isinstance(pv, (int, float)):
+                if pv is None:
+                    issues.append(Issue("error", "PARAMETER_NOT_SET",
+                                        f"{rid} needs a value for 'params.{leaf.value_ref[1][0]}'. Thresholds must come from your approved policy.", [rid]))
+                elif leaf.operator in ("gt", "gte", "lt", "lte") and (isinstance(pv, bool) or not isinstance(pv, (int, float))):
                     issues.append(Issue("error", "PARAMETER_TYPE", f"{rid}: parameter '{leaf.value_ref[1][0]}' must be numeric for '{leaf.operator}'", [rid]))
 
     # FR-13: conflicting policies. Two enabled policies conflict when they can both apply,

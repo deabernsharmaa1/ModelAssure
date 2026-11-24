@@ -6,17 +6,9 @@ import { Badge, Button, Card, Empty, ErrorBox, Field, Json, Loading, Modal, Mono
 import { ApiError, api } from "@/lib/api";
 import { CAN, useAuth } from "@/lib/auth";
 import { fmtDate, short } from "@/lib/format";
-import type { Issue, PolicySet, TestSuite } from "@/lib/types";
+import type { Issue, PolicySet, PolicyTemplate, Project, TestSuite } from "@/lib/types";
 
 type PolicyDoc = { label?: string; parameters?: Record<string, unknown>; policies?: Record<string, unknown>[]; change_controls?: Record<string, unknown>[]; expected_changes?: Record<string, unknown>[] };
-
-const TEMPLATE = {
-  label: "draft", parameters: { min_dscr: 1.25 },
-  derived_fields: [{ name: "dscr", operator: "div", args: ["monthly_cash_available", "monthly_debt_service"] }],
-  policies: [{ policy_id: "POL-001", version: 1, description: "Mandatory bureau data unavailable requires manual review",
-    when: { field: "bureau.status", operator: "eq", value: "UNAVAILABLE", if_missing: "false" },
-    assert: { field: "decision", operator: "eq", value: "REVIEW" }, severity: "CRITICAL", precedence: 80 }],
-};
 
 function Issues({ issues }: { issues: Issue[] }) {
   if (!issues.length) return <p className="text-sm text-green-700">✔ No validation issues.</p>;
@@ -225,16 +217,86 @@ function PolicySets({ projectId }: { projectId: string }) {
           </>
         )}
       </div>
-      <Modal open={creating} onOpenChange={setCreating} title="New policy set" description="Start from a template. You can edit and validate it before submitting for approval.">
-        <Field label="Name"><input className={inputCls} value={newName} onChange={(e) => setNewName(e.target.value)} /></Field>
-        <div className="mt-4"><Button variant="primary" disabled={!newName} onClick={() => act(async () => {
-          const n = await api.post<PolicySet>("/v1/policy-sets", { project_id: projectId, name: newName, content: TEMPLATE });
-          setCreating(false); setNewName(""); setSel(n.id);
-        })}>Create draft</Button></div>
-      </Modal>
+      <NewPolicySet open={creating} onOpenChange={setCreating} projectId={projectId}
+                    onCreated={async (id) => { setCreating(false); await list.reload(); setSel(id); }} />
     </div>
   );
 }
+
+function NewPolicySet({ open, onOpenChange, projectId, onCreated }: { open: boolean; onOpenChange: (o: boolean) => void; projectId: string; onCreated: (id: string) => void }) {
+  const templates = useApi(() => api.get<PolicyTemplate[]>("/v1/policy-templates"), []);
+  const [tid, setTid] = useState("");
+  const [name, setName] = useState("");
+  const [params, setParams] = useState<Record<string, string>>({});
+  const [check, setCheck] = useState<{ valid: boolean; issues: Issue[] } | null>(null);
+  const [error, setError] = useState<ApiError | null>(null);
+  const t = templates.data?.find((x) => x.template_id === tid);
+  useEffect(() => { if (!tid && templates.data?.length) setTid(templates.data[0].template_id); }, [templates.data, tid]);
+  useEffect(() => { setParams({}); setCheck(null); if (t && !name) setName(t.name); }, [tid]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const values = () => Object.fromEntries((t?.parameters ?? []).filter((p) => params[p.name]?.trim()).map((p) => [p.name, Number(params[p.name])]));
+  const badNumber = (t?.parameters ?? []).some((p) => params[p.name]?.trim() && Number.isNaN(Number(params[p.name])));
+  const create = async () => {
+    setError(null);
+    try {
+      const r = await api.post<{ content: unknown; validation: { valid: boolean; issues: Issue[] } }>(`/v1/policy-templates/${tid}/instantiate`, { parameters: values() });
+      setCheck(r.validation);
+      const n = await api.post<PolicySet>("/v1/policy-sets", { project_id: projectId, name, content: r.content });
+      setName(""); setParams({}); setCheck(null); onCreated(n.id);
+    } catch (e) { setError(e as ApiError); }
+  };
+  return (
+    <Modal open={open} onOpenChange={onOpenChange} wide title="New policy set"
+           description="Start from a template, enter your institution's own thresholds, then review and submit for approval. Every threshold starts empty: ModelAssure never chooses them for you.">
+      {templates.loading ? <Loading /> : (
+        <div className="space-y-4">
+          <fieldset><legend className="mb-2 text-sm font-medium text-slate-700">Template</legend>
+            <div className="grid gap-2 md:grid-cols-2">
+              {templates.data?.map((x) => (
+                <label key={x.template_id} className={`cursor-pointer rounded-md border p-3 text-sm ${tid === x.template_id ? "border-blue-600 bg-blue-50" : "border-slate-200"}`}>
+                  <input type="radio" name="template" className="sr-only" checked={tid === x.template_id} onChange={() => setTid(x.template_id)} />
+                  <div className="font-medium">{x.name}</div>
+                  <div className="mt-1 text-xs text-slate-600">{x.summary}</div>
+                  <div className="mt-1 text-xs text-slate-500">{x.counts.policies} policies · {x.counts.change_controls} change controls</div>
+                </label>
+              ))}
+            </div>
+          </fieldset>
+          {t && (
+            <>
+              {t.legal_note && <p className="rounded bg-amber-50 px-3 py-2 text-xs text-amber-900">{t.legal_note}</p>}
+              <Field label="Policy set name"><input className={inputCls} value={name} onChange={(e) => setName(e.target.value)} /></Field>
+              <div className="grid gap-3 md:grid-cols-2">
+                {t.parameters.map((p) => (
+                  <Field key={p.name} label={p.label} hint={p.help}
+                         error={params[p.name]?.trim() && Number.isNaN(Number(params[p.name])) ? "Enter a number" : undefined}>
+                    <input className={inputCls} inputMode="decimal" placeholder="Your approved value" value={params[p.name] ?? ""}
+                           onChange={(e) => setParams({ ...params, [p.name]: e.target.value })} />
+                  </Field>
+                ))}
+              </div>
+              <details className="text-sm"><summary className="cursor-pointer text-blue-800">Policies in this template</summary>
+                <ul className="mt-2 space-y-1">{t.policies.map((p) => <li key={p.policy_id}><Mono>{p.policy_id}</Mono> <Badge value={p.severity} /> {p.description}</li>)}</ul>
+                <p className="mt-2 text-xs text-slate-500">Input fields the policies read: {t.required_input_fields.join(", ")}.</p>
+              </details>
+              {t.parameters.some((p) => !params[p.name]?.trim()) && (
+                <p className="text-xs text-slate-600">You can create the draft now and fill in thresholds later; it can&apos;t be submitted for approval until every threshold has a value.</p>
+              )}
+              {check && <Issues issues={check.issues} />}
+              <ErrorBox error={error} />
+              <Button variant="primary" disabled={!name || badNumber} onClick={create}>Create draft</Button>
+            </>
+          )}
+        </div>
+      )}
+    </Modal>
+  );
+}
+
+const PROFILES = [
+  { value: "sme_lending", label: "SME lending (DSCR-based affordability)", suite: "SME lending — standard release suite" },
+  { value: "consumer_credit", label: "Consumer credit / BNPL (debt-service ratio)", suite: "Consumer credit — standard release suite" },
+];
 
 const GENERATORS = [
   ["normal", "Normal cases"], ["boundary", "Boundary testing (thresholds from policies)"], ["missing_data", "Missing data"],
@@ -246,6 +308,11 @@ function Suites({ projectId }: { projectId: string }) {
   const { has } = useAuth();
   const suites = useApi(() => api.get<TestSuite[]>(`/v1/test-suites?project_id=${projectId}`), [projectId]);
   const policySets = useApi(() => api.get<PolicySet[]>(`/v1/policy-sets?project_id=${projectId}`), [projectId]);
+  const project = useApi(() => api.get<Project>(`/v1/projects/${projectId}`), [projectId]);
+  const [profile, setProfile] = useState("sme_lending");
+  useEffect(() => {
+    if (project.data?.system?.category === "CONSUMER_CREDIT_DECISION") { setProfile("consumer_credit"); setName(PROFILES[1].suite); }
+  }, [project.data]);
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("SME lending — standard release suite");
   const [seed, setSeed] = useState("20261124");
@@ -257,7 +324,7 @@ function Suites({ projectId }: { projectId: string }) {
   const [casesOf, setCasesOf] = useState<TestSuite | null>(null);
   const cases = useApi(() => (casesOf ? api.get<{ total: number; items: { case_key: string; category: string; input: unknown; scenario: Record<string, unknown>; tags: string[] }[] }>(`/v1/test-suites/${casesOf.id}/cases?limit=60`) : Promise.resolve(null)), [casesOf?.id]);
 
-  const body = () => ({ project_id: projectId, name, config: { seed: Number(seed), generators: [...gens].map((g) => (g === "property" ? { type: g, count: Number(count) } : g === "duplicate" ? { type: g, repeat: 3 } : { type: g })) }, policy_set_ids: [...psIds] });
+  const body = () => ({ project_id: projectId, name, config: { seed: Number(seed), profile, generators: [...gens].map((g) => (g === "property" ? { type: g, count: Number(count) } : g === "duplicate" ? { type: g, repeat: 3 } : { type: g })) }, policy_set_ids: [...psIds] });
   const toggle = (s: Set<string>, v: string, set: (x: Set<string>) => void) => { const n = new Set(s); if (n.has(v)) n.delete(v); else n.add(v); set(n); };
 
   return (
@@ -284,6 +351,9 @@ function Suites({ projectId }: { projectId: string }) {
           <div className="md:col-span-2"><Field label="Name"><input className={inputCls} value={name} onChange={(e) => setName(e.target.value)} /></Field></div>
           <Field label="Seed"><input className={inputCls} value={seed} onChange={(e) => setSeed(e.target.value)} /></Field>
         </div>
+        <div className="mt-4"><Field label="Product profile" hint="Shapes the synthetic applicants: which financial fields they carry and what a healthy or stretched case looks like.">
+          <Select value={profile} onChange={(v) => { setProfile(v); setName(PROFILES.find((p) => p.value === v)!.suite); setPreview(null); }} options={PROFILES} />
+        </Field></div>
         <fieldset className="mt-4"><legend className="mb-2 text-sm font-medium text-slate-700">Scenario categories</legend>
           <div className="grid gap-2 md:grid-cols-2">
             {GENERATORS.map(([g, label]) => (

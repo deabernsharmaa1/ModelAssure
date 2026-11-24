@@ -127,3 +127,22 @@ export interface ComplianceFramework {
   nature: string; source_url: string; reference_note?: string; summary: Record<string, number>; controls: ComplianceControl[];
 }
 export interface ComplianceResult { run_id: string; run_number: number; disclaimer: string; frameworks: ComplianceFramework[] }
+
+// ---- onboarding -----------------------------------------------------------------------------
+export interface TemplateParameter { name: string; label: string; type: "number"; help: string; example: number }
+export interface PolicyTemplate {
+  template_id: string; name: string; product: string; summary: string; legal_note?: string | null;
+  generator_profile: string; parameters: TemplateParameter[]; required_input_fields: string[];
+  counts: { policies: number; change_controls: number };
+  policies: { policy_id: string; description: string; severity: string }[]; template_hash: string;
+}
+export interface SetupStep { key: string; title: string; role: string; done: boolean; detail: string }
+export interface SetupStatus { project_id: string; steps: SetupStep[]; completed: number; total: number; next_step: string | null }
+export interface MappingSuggestion {
+  mapping: Record<string, unknown>; valid: boolean;
+  fields: { direction: "request" | "response"; canonical_field: string; customer_field: string; matched_by: string }[];
+  unmatched: { request: string[]; response: string[] };
+  type_mismatches: { customer_field: string; canonical_field: string; expected: string; sample_type: string; note: string }[];
+  canonical_inputs_not_found: string[]; decision_values: Record<string, string>;
+  response_checks: { sample: number; ok: boolean; errors: string[] }[]; notes: string[];
+}

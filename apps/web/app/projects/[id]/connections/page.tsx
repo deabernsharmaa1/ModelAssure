@@ -6,7 +6,7 @@ import { Badge, Button, Card, Empty, ErrorBox, Field, Loading, Modal, Mono, Page
 import { ApiError, api } from "@/lib/api";
 import { CAN, useAuth } from "@/lib/auth";
 import { fmtDate, short } from "@/lib/format";
-import type { Connection, Project, SystemVersion } from "@/lib/types";
+import type { Connection, MappingSuggestion, Project, SystemVersion } from "@/lib/types";
 
 const EXAMPLE_MAPPING = {
   request: { fields: { applicationId: "case_id", productCode: "product", requestedAmount: "requested_amount", currency: "currency",
@@ -18,10 +18,67 @@ const EXAMPLE_MAPPING = {
     reason_codes: { source: "reasonCodes" }, trace_id: { source: "traceId" } } },
 };
 
+function SuggestMapping({ onUse }: { onUse: (mapping: Record<string, unknown>) => void }) {
+  const [req, setReq] = useState("");
+  const [resp, setResp] = useState("");
+  const [result, setResult] = useState<MappingSuggestion | null>(null);
+  const [error, setError] = useState<ApiError | null>(null);
+  const run = async () => {
+    setError(null); setResult(null);
+    let sampleRequest: unknown = null, responses: unknown;
+    try {
+      if (req.trim()) sampleRequest = JSON.parse(req);
+      responses = JSON.parse(resp);
+    } catch { setError(new ApiError(0, "INVALID", "Samples must be valid JSON")); return; }
+    try {
+      setResult(await api.post<MappingSuggestion>("/v1/connections/suggest-mapping", {
+        sample_request: sampleRequest, sample_responses: Array.isArray(responses) ? responses : [responses] }));
+    } catch (e) { setError(e as ApiError); }
+  };
+  return (
+    <div className="space-y-3 rounded-md border border-blue-200 bg-blue-50/40 p-3">
+      <p className="text-sm text-slate-700">Paste one request your API accepts and one or more responses it returns (an array is fine; include different decisions if you can). ModelAssure drafts the mapping. Nothing is sent to your system.</p>
+      <div className="grid gap-3 md:grid-cols-2">
+        <Field label="Sample request (optional)"><textarea aria-label="Sample request" className={`${inputCls} font-mono text-xs`} rows={7} value={req} onChange={(e) => setReq(e.target.value)} spellCheck={false} placeholder='{"applicationId": "A-1", "requestedAmount": 100000, ...}' /></Field>
+        <Field label="Sample response(s)"><textarea aria-label="Sample responses" className={`${inputCls} font-mono text-xs`} rows={7} value={resp} onChange={(e) => setResp(e.target.value)} spellCheck={false} placeholder='[{"applicationId": "A-1", "finalStatus": "APPROVED"}, ...]' /></Field>
+      </div>
+      <Button size="sm" onClick={run} disabled={!resp.trim()}>Suggest mapping</Button>
+      <ErrorBox error={error} />
+      {result && (
+        <div className="space-y-2 text-sm">
+          <div className="grid gap-1 md:grid-cols-2">
+            {result.fields.map((f) => (
+              <div key={`${f.direction}-${f.canonical_field}`} className="text-xs">
+                <span className="text-slate-500">{f.direction}</span> <Mono>{f.customer_field}</Mono> → <Mono>{f.canonical_field}</Mono>
+                {f.matched_by === "synonym" && <span className="ml-1 text-amber-700">(by synonym, check it)</span>}
+              </div>
+            ))}
+          </div>
+          {Object.keys(result.decision_values).length > 0 && (
+            <p className="text-xs">Decision values: {Object.entries(result.decision_values).map(([k, v]) => <span key={k} className="mr-2"><Mono>{k}</Mono> → <b>{v}</b></span>)}</p>
+          )}
+          {result.type_mismatches.map((m) => (
+            <p key={m.customer_field} className="text-xs text-amber-800"><Mono>{m.customer_field}</Mono> looks like <Mono>{m.canonical_field}</Mono>, but its sample is a {m.sample_type} and ModelAssure expects a {m.expected}. {m.note}</p>
+          ))}
+          {(result.unmatched.request.length + result.unmatched.response.length) > 0 && (
+            <p className="text-xs text-slate-600">Not recognised (map by hand if they matter): {[...result.unmatched.request, ...result.unmatched.response].join(", ")}</p>
+          )}
+          {result.canonical_inputs_not_found.length > 0 && (
+            <p className="text-xs text-slate-600">ModelAssure fields not in your sample request: {result.canonical_inputs_not_found.join(", ")}. Only the ones your policies read matter (each template lists them); a policy that reads a missing field is UNKNOWN, never a pass.</p>
+          )}
+          {result.notes.map((n, i) => <p key={i} className="text-xs text-slate-700">• {n}</p>)}
+          {result.response_checks.some((c) => !c.ok) && <p className="text-xs text-red-800">Some samples don&apos;t normalise yet: {result.response_checks.filter((c) => !c.ok).flatMap((c) => c.errors).join("; ")}</p>}
+          <Button size="sm" variant="primary" disabled={!result.valid} onClick={() => onUse(result.mapping)}>Use this mapping</Button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function NewConnection({ versions, onCreated }: { versions: SystemVersion[]; onCreated: () => void }) {
   const [open, setOpen] = useState(false);
   const [f, setF] = useState({ system_version_id: "", endpoint: "", auth_header: "X-API-Key", credential: "", timeout_ms: "5000", max_concurrency: "5", max_rps: "", dependency_control_url: "", dependency_credential: "" });
-  const [mapping, setMapping] = useState(JSON.stringify(EXAMPLE_MAPPING, null, 2));
+  const [mapping, setMapping] = useState("{}");
   const [error, setError] = useState<ApiError | null>(null);
   const set = (k: keyof typeof f) => (v: string) => setF((x) => ({ ...x, [k]: v }));
   const submit = async () => {
@@ -55,9 +112,13 @@ function NewConnection({ versions, onCreated }: { versions: SystemVersion[]; onC
           <Field label="Dependency simulator URL" hint="Needed for injected bureau/fraud/identity faults"><input className={inputCls} value={f.dependency_control_url} onChange={(e) => set("dependency_control_url")(e.target.value)} /></Field>
           <Field label="Dependency simulator key"><input className={inputCls} type="password" autoComplete="off" value={f.dependency_credential} onChange={(e) => set("dependency_credential")(e.target.value)} /></Field>
           <div className="md:col-span-2">
-            <Field label="Field mapping (customer ↔ common decision schema)" hint="request.fields: customer field ← canonical field. response.fields: canonical field ← customer field, with decision value mapping.">
-              <textarea className={`${inputCls} font-mono text-xs`} rows={12} value={mapping} onChange={(e) => setMapping(e.target.value)} spellCheck={false} />
+            <SuggestMapping onUse={(m) => setMapping(JSON.stringify(m, null, 2))} />
+          </div>
+          <div className="md:col-span-2">
+            <Field label="Field mapping (customer ↔ common decision schema)" hint="Empty {} means your API already uses ModelAssure's field names. request.fields: customer field ← canonical field. response.fields: canonical field ← customer field, with decision value mapping.">
+              <textarea aria-label="Field mapping JSON" className={`${inputCls} font-mono text-xs`} rows={12} value={mapping} onChange={(e) => setMapping(e.target.value)} spellCheck={false} />
             </Field>
+            <button type="button" className="mt-1 text-xs text-blue-800 underline" onClick={() => setMapping(JSON.stringify(EXAMPLE_MAPPING, null, 2))}>Load the fictional bank&apos;s example mapping</button>
           </div>
         </div>
         <div className="mt-4 space-y-3"><ErrorBox error={error} />

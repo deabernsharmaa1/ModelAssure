@@ -1,0 +1,297 @@
+{
+  "template_id": "consumer-credit-affordability",
+  "name": "Consumer credit & BNPL — affordability controls",
+  "product": "CONSUMER_CREDIT",
+  "generator_profile": "consumer_credit",
+  "summary": "Affordability (debt-service ratio), data completeness, income verification, bureau, fraud, identity and dependency fallback controls for consumer credit and BNPL decisions.",
+  "legal_note": "The Consumer Credit Act 2025 (in force 1 March 2026) requires non-bank credit providers to assess affordability before extending credit. This template helps test that automated decisions follow your own affordability policy; it is not legal advice and does not define what the Act requires.",
+  "parameters": [
+    {
+      "name": "max_dsr",
+      "label": "Maximum debt-service ratio",
+      "type": "number",
+      "help": "Your affordability policy's maximum (existing commitments + new instalment) ÷ net monthly income. Enter it as a fraction (format: 0.6 means 60%).",
+      "example": 0.6
+    }
+  ],
+  "required_input_fields": [
+    "case_id",
+    "requested_amount",
+    "requested_instalment",
+    "monthly_net_income",
+    "monthly_commitments",
+    "income_verified",
+    "bureau.status",
+    "fraud.status",
+    "identity.status"
+  ],
+  "content": {
+    "label": "draft",
+    "description": "Consumer credit (including BNPL) affordability and decision controls. A starting point for lenders licensed under the Consumer Credit Act 2025; not legal advice.",
+    "parameters": {
+      "max_dsr": null
+    },
+    "derived_fields": [
+      {
+        "name": "total_commitments",
+        "operator": "add",
+        "args": [
+          "monthly_commitments",
+          "requested_instalment"
+        ],
+        "description": "Existing monthly commitments plus the new instalment"
+      },
+      {
+        "name": "dsr",
+        "operator": "div",
+        "args": [
+          "derived.total_commitments",
+          "monthly_net_income"
+        ],
+        "description": "Debt-service ratio after the new credit"
+      }
+    ],
+    "policies": [
+      {
+        "policy_id": "CC-001",
+        "version": 1,
+        "description": "No automatic approval without the data needed for an affordability assessment",
+        "when": {
+          "any": [
+            {
+              "field": "monthly_net_income",
+              "operator": "not_exists"
+            },
+            {
+              "field": "monthly_commitments",
+              "operator": "not_exists"
+            },
+            {
+              "field": "requested_instalment",
+              "operator": "not_exists"
+            }
+          ]
+        },
+        "assert": {
+          "field": "decision",
+          "operator": "ne",
+          "value": "APPROVE"
+        },
+        "severity": "CRITICAL",
+        "enabled": true,
+        "precedence": 60
+      },
+      {
+        "policy_id": "CC-002",
+        "version": 1,
+        "description": "Debt-service ratio above the approved maximum must be declined or referred",
+        "when": {
+          "field": "derived.dsr",
+          "operator": "gt",
+          "value_ref": "params.max_dsr"
+        },
+        "assert": {
+          "field": "decision",
+          "operator": "in",
+          "value": [
+            "DECLINE",
+            "REFER"
+          ]
+        },
+        "severity": "CRITICAL",
+        "enabled": true,
+        "precedence": 50,
+        "missing_data": "not_applicable"
+      },
+      {
+        "policy_id": "CC-003",
+        "version": 1,
+        "description": "Unverified income must not be automatically approved (institution policy choice)",
+        "when": {
+          "field": "income_verified",
+          "operator": "eq",
+          "value": false,
+          "if_missing": "false"
+        },
+        "assert": {
+          "field": "decision",
+          "operator": "ne",
+          "value": "APPROVE"
+        },
+        "severity": "HIGH",
+        "enabled": true,
+        "precedence": 55
+      },
+      {
+        "policy_id": "CC-004",
+        "version": 1,
+        "description": "Credit bureau data unavailable requires manual review",
+        "when": {
+          "any": [
+            {
+              "field": "bureau.status",
+              "operator": "eq",
+              "value": "UNAVAILABLE",
+              "if_missing": "false"
+            },
+            {
+              "field": "scenario.faults.bureau",
+              "operator": "in",
+              "value": [
+                "UNAVAILABLE",
+                "MALFORMED",
+                "MISSING_RESPONSE"
+              ]
+            }
+          ]
+        },
+        "assert": {
+          "field": "decision",
+          "operator": "eq",
+          "value": "REVIEW"
+        },
+        "severity": "CRITICAL",
+        "enabled": true,
+        "precedence": 80
+      },
+      {
+        "policy_id": "CC-005",
+        "version": 1,
+        "description": "Unresolved high-risk fraud alert must be held",
+        "when": {
+          "all": [
+            {
+              "field": "fraud.status",
+              "operator": "eq",
+              "value": "HIGH",
+              "if_missing": "false"
+            },
+            {
+              "any": [
+                {
+                  "field": "fraud.alert_resolved",
+                  "operator": "not_exists"
+                },
+                {
+                  "field": "fraud.alert_resolved",
+                  "operator": "eq",
+                  "value": false
+                }
+              ]
+            }
+          ]
+        },
+        "assert": {
+          "field": "decision",
+          "operator": "eq",
+          "value": "HOLD"
+        },
+        "severity": "CRITICAL",
+        "enabled": true,
+        "precedence": 100
+      },
+      {
+        "policy_id": "CC-006",
+        "version": 1,
+        "description": "Incomplete identity verification must not be automatically approved",
+        "when": {
+          "any": [
+            {
+              "field": "identity.status",
+              "operator": "in",
+              "value": [
+                "PENDING",
+                "FAILED"
+              ],
+              "if_missing": "false"
+            },
+            {
+              "field": "scenario.faults.identity",
+              "operator": "ne",
+              "value": "NONE"
+            }
+          ]
+        },
+        "assert": {
+          "field": "decision",
+          "operator": "ne",
+          "value": "APPROVE"
+        },
+        "severity": "CRITICAL",
+        "enabled": true,
+        "precedence": 70
+      },
+      {
+        "policy_id": "CC-007",
+        "version": 1,
+        "description": "External dependency timeout applies the approved fallback (manual review)",
+        "when": {
+          "any": [
+            {
+              "field": "scenario.faults.bureau",
+              "operator": "eq",
+              "value": "TIMEOUT"
+            },
+            {
+              "field": "scenario.faults.fraud",
+              "operator": "eq",
+              "value": "TIMEOUT"
+            },
+            {
+              "field": "scenario.faults.identity",
+              "operator": "eq",
+              "value": "TIMEOUT"
+            }
+          ]
+        },
+        "assert": {
+          "field": "decision",
+          "operator": "eq",
+          "value": "REVIEW"
+        },
+        "severity": "CRITICAL",
+        "enabled": true,
+        "precedence": 90
+      }
+    ],
+    "change_controls": [
+      {
+        "rule_id": "CHG-001",
+        "description": "Any decline-to-approve change needs reviewer attention",
+        "from": [
+          "DECLINE"
+        ],
+        "to": [
+          "APPROVE"
+        ],
+        "action": "FLAG",
+        "severity": "HIGH"
+      },
+      {
+        "rule_id": "CHG-002",
+        "description": "A hold must never become an automatic approval",
+        "from": [
+          "HOLD"
+        ],
+        "to": [
+          "APPROVE"
+        ],
+        "action": "PROHIBIT",
+        "severity": "CRITICAL"
+      }
+    ],
+    "expected_changes": [],
+    "severity_rules": {
+      "UNEXPECTED_CHANGE": "MEDIUM",
+      "TECHNICAL_ERROR": "HIGH"
+    },
+    "release_criteria": {
+      "fail_on_unresolved_severities": [
+        "CRITICAL",
+        "HIGH"
+      ],
+      "max_error_rate": 0.0,
+      "max_inconclusive_rate": 0.0
+    }
+  }
+}

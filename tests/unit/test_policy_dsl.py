@@ -169,3 +169,30 @@ def test_spec_example_policy_pol_001():
     inp = {"case_id": "CASE-1001", "bureau": {"status": "UNAVAILABLE"}}
     [o] = evaluate_policies(cps, build_context(cps, inp, {}, {"decision": "APPROVE"}, None))
     assert (o.status, o.expected, o.observed) == (VIOLATED, "REVIEW", "APPROVE")
+
+
+# ---- property tests of the policy engine (Hypothesis) ------------------------------------------
+from hypothesis import given, settings  # noqa: E402
+from hypothesis import strategies as st  # noqa: E402
+
+from modules.policies.dsl import eval_node, parse_condition  # noqa: E402
+
+_numbers = st.one_of(st.integers(-10**9, 10**9), st.floats(allow_nan=False, allow_infinity=False, width=64))
+
+
+@settings(max_examples=300, deadline=None)
+@given(x=_numbers, t=_numbers)
+def test_comparisons_are_complementary(x, t):
+    """For any present numeric value exactly one of gt / lte (and lt / gte) holds."""
+    ctx = {"input": {"v": x}}
+    for a, b in (("gt", "lte"), ("lt", "gte")):
+        ra = eval_node(parse_condition({"field": "v", "operator": a, "value": t}, "input"), ctx)
+        rb = eval_node(parse_condition({"field": "v", "operator": b, "value": t}, "input"), ctx)
+        assert {ra, rb} == {True, False}
+
+
+@settings(max_examples=200, deadline=None)
+@given(t=_numbers, op=st.sampled_from(["eq", "ne", "gt", "gte", "lt", "lte"]))
+def test_missing_field_is_unknown_never_true(t, op):
+    """Three-valued logic: a comparison on an absent field is UNKNOWN, never silently TRUE/FALSE."""
+    assert eval_node(parse_condition({"field": "v", "operator": op, "value": t}, "input"), {"input": {}}) is None

@@ -1,0 +1,263 @@
+{
+  "template_id": "sme-lending-core",
+  "name": "SME lending — core decision controls",
+  "product": "SME_LENDING",
+  "generator_profile": "sme_lending",
+  "summary": "Six controls most SME lenders apply to automated decisions (bureau, fraud, affordability, identity, dependency fallback, missing data), plus two change controls. Edit freely before submitting for approval.",
+  "parameters": [
+    {
+      "name": "min_dscr",
+      "label": "Minimum debt-service coverage ratio",
+      "type": "number",
+      "help": "Your credit policy's minimum monthly cash available ÷ monthly debt service. Below it, decisions must be REFER or DECLINE. Enter it as a ratio (format: 1.25 means 1.25×).",
+      "example": 1.25
+    }
+  ],
+  "required_input_fields": [
+    "case_id",
+    "requested_amount",
+    "monthly_cash_available",
+    "monthly_debt_service",
+    "bureau.status",
+    "fraud.status",
+    "fraud.alert_resolved",
+    "identity.status"
+  ],
+  "content": {
+    "label": "draft",
+    "description": "SME working-capital lending: bureau, fraud, identity, dependency fallback, affordability (DSCR) and missing-data controls.",
+    "parameters": {
+      "min_dscr": null
+    },
+    "derived_fields": [
+      {
+        "name": "dscr",
+        "operator": "div",
+        "args": [
+          "monthly_cash_available",
+          "monthly_debt_service"
+        ],
+        "description": "Debt-service coverage ratio"
+      }
+    ],
+    "policies": [
+      {
+        "policy_id": "POL-001",
+        "version": 1,
+        "description": "Mandatory bureau data unavailable requires manual review",
+        "when": {
+          "any": [
+            {
+              "field": "bureau.status",
+              "operator": "eq",
+              "value": "UNAVAILABLE",
+              "if_missing": "false"
+            },
+            {
+              "field": "scenario.faults.bureau",
+              "operator": "in",
+              "value": [
+                "UNAVAILABLE",
+                "MALFORMED",
+                "MISSING_RESPONSE"
+              ]
+            }
+          ]
+        },
+        "assert": {
+          "field": "decision",
+          "operator": "eq",
+          "value": "REVIEW"
+        },
+        "severity": "CRITICAL",
+        "enabled": true,
+        "precedence": 80
+      },
+      {
+        "policy_id": "POL-002",
+        "version": 1,
+        "description": "Unresolved high-risk fraud alert must be held for investigation",
+        "when": {
+          "all": [
+            {
+              "field": "fraud.status",
+              "operator": "eq",
+              "value": "HIGH",
+              "if_missing": "false"
+            },
+            {
+              "any": [
+                {
+                  "field": "fraud.alert_resolved",
+                  "operator": "not_exists"
+                },
+                {
+                  "field": "fraud.alert_resolved",
+                  "operator": "eq",
+                  "value": false
+                }
+              ]
+            }
+          ]
+        },
+        "assert": {
+          "field": "decision",
+          "operator": "eq",
+          "value": "HOLD"
+        },
+        "severity": "CRITICAL",
+        "enabled": true,
+        "precedence": 100
+      },
+      {
+        "policy_id": "POL-003",
+        "version": 1,
+        "description": "Debt-service coverage below the approved limit must be referred or declined",
+        "when": {
+          "field": "derived.dscr",
+          "operator": "lt",
+          "value_ref": "params.min_dscr"
+        },
+        "assert": {
+          "field": "decision",
+          "operator": "in",
+          "value": [
+            "REFER",
+            "DECLINE"
+          ]
+        },
+        "severity": "HIGH",
+        "enabled": true,
+        "precedence": 50,
+        "missing_data": "not_applicable"
+      },
+      {
+        "policy_id": "POL-004",
+        "version": 1,
+        "description": "Incomplete identity verification must not be automatically approved",
+        "when": {
+          "any": [
+            {
+              "field": "identity.status",
+              "operator": "in",
+              "value": [
+                "PENDING",
+                "FAILED"
+              ],
+              "if_missing": "false"
+            },
+            {
+              "field": "scenario.faults.identity",
+              "operator": "ne",
+              "value": "NONE"
+            }
+          ]
+        },
+        "assert": {
+          "field": "decision",
+          "operator": "ne",
+          "value": "APPROVE"
+        },
+        "severity": "CRITICAL",
+        "enabled": true,
+        "precedence": 70
+      },
+      {
+        "policy_id": "POL-005",
+        "version": 1,
+        "description": "External dependency timeout must apply the approved fallback (manual review)",
+        "when": {
+          "any": [
+            {
+              "field": "scenario.faults.bureau",
+              "operator": "eq",
+              "value": "TIMEOUT"
+            },
+            {
+              "field": "scenario.faults.fraud",
+              "operator": "eq",
+              "value": "TIMEOUT"
+            },
+            {
+              "field": "scenario.faults.identity",
+              "operator": "eq",
+              "value": "TIMEOUT"
+            }
+          ]
+        },
+        "assert": {
+          "field": "decision",
+          "operator": "eq",
+          "value": "REVIEW"
+        },
+        "severity": "CRITICAL",
+        "enabled": true,
+        "precedence": 90
+      },
+      {
+        "policy_id": "POL-007",
+        "version": 1,
+        "description": "Missing mandatory financial data must not be automatically approved",
+        "when": {
+          "any": [
+            {
+              "field": "monthly_cash_available",
+              "operator": "not_exists"
+            },
+            {
+              "field": "monthly_debt_service",
+              "operator": "not_exists"
+            }
+          ]
+        },
+        "assert": {
+          "field": "decision",
+          "operator": "ne",
+          "value": "APPROVE"
+        },
+        "severity": "HIGH",
+        "enabled": true,
+        "precedence": 60
+      }
+    ],
+    "change_controls": [
+      {
+        "rule_id": "CHG-001",
+        "description": "Any decline-to-approve change needs reviewer attention",
+        "from": [
+          "DECLINE"
+        ],
+        "to": [
+          "APPROVE"
+        ],
+        "action": "FLAG",
+        "severity": "HIGH"
+      },
+      {
+        "rule_id": "CHG-002",
+        "description": "A hold must never become an automatic approval",
+        "from": [
+          "HOLD"
+        ],
+        "to": [
+          "APPROVE"
+        ],
+        "action": "PROHIBIT",
+        "severity": "CRITICAL"
+      }
+    ],
+    "severity_rules": {
+      "UNEXPECTED_CHANGE": "MEDIUM",
+      "TECHNICAL_ERROR": "HIGH"
+    },
+    "release_criteria": {
+      "fail_on_unresolved_severities": [
+        "CRITICAL",
+        "HIGH"
+      ],
+      "max_error_rate": 0.0,
+      "max_inconclusive_rate": 0.0
+    },
+    "expected_changes": []
+  }
+}

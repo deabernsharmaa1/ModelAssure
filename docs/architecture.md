@@ -56,7 +56,7 @@ A modular monolith with isolated background workers (spec §5).
 
 ## Technology
 
-Python 3.12, FastAPI, Pydantic v2, SQLAlchemy 2, Alembic, PostgreSQL 16, HTTPX, Hypothesis,
+Python 3.12, FastAPI, Pydantic v2, SQLAlchemy 2, Alembic, PostgreSQL 16, HTTPX, Hypothesis (property tests of the policy engine),
 pandas, pandera, WeasyPrint (PDF), OpenTelemetry (W3C trace context), Next.js 16, React 19,
 TypeScript, Tailwind 4, Radix UI primitives. No Kubernetes, Kafka, graph database or agent
 framework (spec §5.1).

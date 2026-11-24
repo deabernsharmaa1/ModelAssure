@@ -1,6 +1,6 @@
 {
   "name": "SME lending — standard release suite",
-  "description": "Default Version 1 suite: everyday cases, DSCR boundaries, missing data, dependency faults, credit/fraud conflicts, duplicates, invalid input and Hypothesis-generated regression cases.",
+  "description": "Default Version 1 suite: everyday cases, DSCR boundaries, missing data, dependency faults, credit/fraud conflicts, duplicates, invalid input and seeded property-style regression cases.",
   "seed": 20261124,
   "generators": [
     {"type": "normal"},

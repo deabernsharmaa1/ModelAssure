@@ -43,11 +43,11 @@ code are relative to `apps/api/` unless stated.
 | FR-04 Version registry | `POST /v1/systems/{id}/versions`; immutable (`integration/…::test_versions_are_immutable`) |
 | FR-05 Audit history | `modules/audit/service.py`; hash chain; `security/…::test_tampering_detected_by_chain_verification` |
 | FR-06 Register endpoints | `POST /v1/connections` |
-| FR-07 Field mapping | `modules/connectors/mapping.py`; transformations kept in evidence |
+| FR-07 Field mapping | `modules/connectors/mapping.py`; transformations kept in evidence. Mapping helper drafts a mapping from sample payloads: `modules/connectors/suggest.py`, `POST /v1/connections/suggest-mapping` |
 | FR-08 Validate auth, schema, format | `POST /v1/connections/{id}/verify` (auth, auth enforced, mapping, schema, reported version) |
 | FR-09 Timeouts, rate limits, concurrency | connection settings, locked into the run snapshot |
 | FR-10 Record versions per response | `test_executions.observed_versions`; mismatch → `ERROR / VERSION_MISMATCH` |
-| FR-11 Structured, versioned policies | `policy_sets` versions with parent links; `modules/policies/` |
+| FR-11 Structured, versioned policies | `policy_sets` versions with parent links; `modules/policies/`. Templates (SME lending, consumer credit / BNPL affordability) with every threshold empty: `modules/policies/templates/`, `GET /v1/policy-templates` |
 | FR-12 Evaluate on normalised inputs and outputs | `modules/policies/policy_set.py::evaluate_policies` |
 | FR-13 Conflicting/invalid policies detected before execution | `POLICY_CONFLICT`, `UNKNOWN_PARAMETER`, structural errors; `integration/…::test_invalid_and_conflicting_policies_flagged_before_execution` |
 | FR-14 Review before activating a changed policy set | submit → approve by a different person; `::test_author_cannot_approve_own_policy_set` |
@@ -64,6 +64,21 @@ Investigating, Fix Proposed, Ready for Retest, Resolved, Accepted Risk, Closed.
 
 Module G (reports): all nine sections; PDF and JSON; CSV of permitted outcomes.
 
+## Additions beyond the specification
+
+Built after market research, to shorten onboarding and support buyers' supervisory work.
+
+| Addition | Where | Tests |
+|---|---|---|
+| Regulatory mapping (BNM AI feedback statement, RMiT, MAS AI guidelines; AICB slot pending) | `modules/compliance/`, release screen, report §10 | `unit/test_compliance_catalogue.py`, `end_to_end/::test_regulatory_mapping_*` |
+| Policy templates with empty, institution-supplied thresholds | `modules/policies/templates/` | `unit/test_onboarding.py`, `integration/test_onboarding_api.py` |
+| Consumer credit / BNPL generator profile | `modules/scenarios/generators.py` (`ConsumerCreditProfile`) | `unit/test_onboarding.py` |
+| Mapping helper from sample payloads | `modules/connectors/suggest.py` | `unit/test_onboarding.py`, `integration/test_onboarding_api.py` |
+| Project setup checklist | `GET /v1/projects/{id}/setup`, project screen | `integration/test_onboarding_api.py` |
+
+There is no consumer-credit simulator: the consumer profile and template are tested at unit and
+API level, not against a fictional consumer lender.
+
 ## Definition of Done (spec §18)
 
 | Criterion | Evidence |
@@ -71,7 +86,7 @@ Module G (reports): all nine sections; PDF and JSON; CSV of permitted outcomes.
 | Create a validation project | `POST /v1/projects`; *New project* screen |
 | Register two versions of an authorised decision API | version registry + verified connections |
 | Configure and approve executable policy rules | policy builder; four-eyes approval |
-| Generate and execute controlled scenarios | suites + runs (1,085 cases) |
+| Generate and execute controlled scenarios | suites + runs (1,178 cases in the standard suite) |
 | Identify seeded violations with reproducible evidence | QA-01, QA-02; evidence viewer |
 | Distinguish authorised changes from confirmed errors | QA-04; change class VIOLATION |
 | Handle failed tests and API errors without false passes | QA-05, QA-06, baseline-error tests |

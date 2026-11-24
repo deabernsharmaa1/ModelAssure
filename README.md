@@ -112,7 +112,7 @@ Password for all: `ModelAssure!2026`
 ## Tests
 
 ```bash
-pytest                                # 164 tests: unit, contract, integration, security, end-to-end
+pytest                                # 191 tests: unit, contract, integration, security, end-to-end
 python scripts/ui_smoke.py            # browser workflow (needs the running stack, Chrome, Playwright)
 (cd apps/web && npm run build)        # type-checks and builds the frontend
 ```

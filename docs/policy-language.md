@@ -23,6 +23,15 @@ A policy set has this shape:
 
 See `decision_simulator/fixtures/policy_set_2026-11.json` for a complete example.
 
+### Templates
+
+`GET /v1/policy-templates` lists ready-made starting points (SME lending core controls; consumer
+credit / BNPL affordability). Every threshold in a template is `null`. A parameter that is still
+`null` is a validation error (`PARAMETER_NOT_SET`), so a policy set cannot be submitted for
+approval until the institution has entered its own values. `POST /v1/policy-templates/{id}/instantiate`
+returns the filled document and its validation without saving anything; the document records
+`source_template` (id and hash) for provenance, which never affects evaluation.
+
 ## Policies (assertions on the candidate's decision)
 
 ```json

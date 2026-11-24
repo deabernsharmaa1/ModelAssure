@@ -15,7 +15,7 @@ export default function NewProject() {
   const [systemId, setSystemId] = useState("");
   const versions = useApi(() => (systemId ? api.get<SystemVersion[]>(`/v1/systems/${systemId}/versions`) : Promise.resolve([])), [systemId]);
   const [form, setForm] = useState({ name: "", business_use_case: "", owner_id: "", baseline_version_id: "", candidate_version_id: "", risk_classification: "HIGH", test_environment: "" });
-  const [newSystem, setNewSystem] = useState({ name: "", vendor: "" });
+  const [newSystem, setNewSystem] = useState({ name: "", vendor: "", category: "SME_LENDING_DECISION" });
   const [newVersion, setNewVersion] = useState({ version: "", expected_model_version: "", description: "" });
   const [error, setError] = useState<ApiError | null>(null);
   const set = (k: keyof typeof form) => (v: string) => setForm((f) => ({ ...f, [k]: v }));
@@ -23,10 +23,10 @@ export default function NewProject() {
   const createSystem = async () => {
     setError(null);
     try {
-      const s = await api.post<System>("/v1/systems", { name: newSystem.name, vendor: newSystem.vendor || null, category: "SME_LENDING_DECISION" });
+      const s = await api.post<System>("/v1/systems", { name: newSystem.name, vendor: newSystem.vendor || null, category: newSystem.category });
       await systems.reload();
       setSystemId(s.id);
-      setNewSystem({ name: "", vendor: "" });
+      setNewSystem({ name: "", vendor: "", category: "SME_LENDING_DECISION" });
     } catch (e) { setError(e as ApiError); }
   };
   const registerVersion = async () => {
@@ -78,7 +78,8 @@ export default function NewProject() {
               <div className="space-y-3">
                 <Field label="Name"><input className={inputCls} value={newSystem.name} onChange={(e) => setNewSystem({ ...newSystem, name: e.target.value })} /></Field>
                 <Field label="Vendor"><input className={inputCls} value={newSystem.vendor} onChange={(e) => setNewSystem({ ...newSystem, vendor: e.target.value })} /></Field>
-                <p className="text-xs text-slate-500">Version 1 supports SME lending decision systems only.</p>
+                <Field label="Decision type"><Select value={newSystem.category} onChange={(v) => setNewSystem({ ...newSystem, category: v })}
+                  options={[{ value: "SME_LENDING_DECISION", label: "SME lending" }, { value: "CONSUMER_CREDIT_DECISION", label: "Consumer credit / BNPL" }]} /></Field>
                 <Button onClick={createSystem} disabled={!newSystem.name}>Register system</Button>
               </div>
             ) : <p className="text-sm text-slate-600">Ask an Engineer to register the decision system and its versions.</p>}

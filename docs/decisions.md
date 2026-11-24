@@ -51,9 +51,17 @@ validation time (FR-13) and is `INCONCLUSIVE` at run time.
 
 ## 6. Reproducibility: generate once, replay forever
 
-Hypothesis is randomised, so suites are generated **once** (fixed seed) when a suite version is
-created, stored and hashed. Runs replay stored cases. Volatile response fields (`trace_id`) are
-excluded from comparisons and decision hashes.
+Suites are generated **once** (fixed seed) when a suite version is created, stored and hashed.
+Runs replay stored cases. Volatile response fields (`trace_id`) are excluded from comparisons and
+decision hashes.
+
+Generation is also reproducible on its own: the same config, seed and `GENERATOR_VERSION` give the
+same suite on any machine. The first build drew regression cases through Hypothesis's test
+runner, but its engine returned different examples for the same seed depending on the run
+context (for example inside pytest versus a plain process). Audit evidence cannot depend on
+that, so the property generator now uses a seeded, edge-biased sampler (`Draw`) that, like
+Hypothesis, over-samples range ends. Hypothesis is still used where it fits: property tests of
+ModelAssure's own policy engine. Each stored suite records the `generator_version` it was built with.
 
 ## 7. Fault injection against real customers
 

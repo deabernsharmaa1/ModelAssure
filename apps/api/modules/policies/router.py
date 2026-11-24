@@ -17,6 +17,7 @@ from db.models import PolicyRow, PolicySet, Project
 from modules.audit.service import record_for
 from modules.identity.auth import Principal, require
 from modules.policies.dsl import PolicyError
+from modules.policies.templates import TemplateError, instantiate, load_templates, summary
 from modules.policies.policy_set import build_context, compile_policy_set, evaluate_policies, policy_fingerprint
 
 router = APIRouter(prefix="/v1", tags=["policies"])
@@ -210,3 +211,35 @@ def policy_diff(old: dict[str, Any], new: dict[str, Any]) -> dict[str, Any]:
                     policy_fingerprint(cold, cold.by_id(k)) != policy_fingerprint(cnew, cnew.by_id(k)):
                 out[key][k] = "behaviour changed via parameters/derived fields"
     return out
+
+
+# ---- Policy templates (onboarding) ----------------------------------------------------------
+@router.get("/policy-templates")
+def list_templates(p: Principal = Depends(require("project.read"))):
+    return [summary(t) for t in load_templates().values()]
+
+
+@router.get("/policy-templates/{template_id}")
+def get_template(template_id: str, p: Principal = Depends(require("project.read"))):
+    t = load_templates().get(template_id)
+    if t is None:
+        raise ApiError(404, "NOT_FOUND", f"template '{template_id}' not found")
+    return summary(t) | {"content": t["content"]}
+
+
+class InstantiateIn(BaseModel):
+    parameters: dict[str, Any] = Field(default_factory=dict)
+    label: str | None = Field(default=None, max_length=100)
+
+
+@router.post("/policy-templates/{template_id}/instantiate")
+def instantiate_template(template_id: str, body: InstantiateIn, p: Principal = Depends(require("policy.edit"))):
+    """Returns a policy-set document with your thresholds filled in, plus its validation. Nothing is
+    saved: create a draft from the content, review it, then submit it for approval as usual."""
+    if template_id not in load_templates():
+        raise ApiError(404, "NOT_FOUND", f"template '{template_id}' not found")
+    try:
+        content = instantiate(template_id, body.parameters, body.label)
+    except TemplateError as e:
+        raise invalid(str(e)) from e
+    return {"content": content, "validation": validate_doc(content)}

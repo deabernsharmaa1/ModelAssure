@@ -37,11 +37,13 @@ MET, PARTIAL, NOT_MET, NO_EVIDENCE, OUT_OF_SCOPE = "MET", "PARTIAL", "NOT_MET", 
 
 @lru_cache
 def load_frameworks() -> dict[str, dict[str, Any]]:
-    out = {}
-    for p in sorted(FRAMEWORK_DIR.glob("*.json")):
-        doc = json.loads(p.read_text(encoding="utf-8"))
-        out[doc["framework_id"]] = doc
-    return out
+    docs = [json.loads(p.read_text(encoding="utf-8")) for p in sorted(FRAMEWORK_DIR.glob("*.json"))]
+    # Malaysian frameworks first (the primary market), frameworks awaiting publication last.
+    docs.sort(key=lambda d: (d["status"] == "PENDING_PUBLICATION", FRAMEWORK_ORDER.get(d["framework_id"], 99)))
+    return {d["framework_id"]: d for d in docs}
+
+
+FRAMEWORK_ORDER = {"BNM-AI-FS-2026": 0, "BNM-RMIT-2026": 1, "MAS-AIRM-2026": 2, "AICB-AI-MRM": 3}
 
 
 @dataclass

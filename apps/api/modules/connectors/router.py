@@ -19,6 +19,7 @@ from modules.audit.service import record_for
 from modules.connectors.client import DecisionClient
 from modules.connectors.egress import EgressError, check_url
 from modules.connectors.mapping import MappingError, validate_mapping
+from modules.connectors.suggest import suggest_mapping
 from modules.connectors.secrets import SecretError, resolve_secret, store_secret
 from modules.identity.auth import Principal, require
 from modules.scenarios.generators import DEFAULT_BASE_CASE
@@ -201,3 +202,19 @@ def verify_connection(connection_id: str, p: Principal = Depends(require("connec
     record_for(db, p, "connection.verify", "connection", c.id, {"status": c.status, "checks": checks})
     db.commit()
     return {"status": c.status, "checks": checks}
+
+
+class SuggestIn(BaseModel):
+    sample_request: dict[str, Any] | None = Field(default=None, description="One request body in your API's own format")
+    sample_responses: list[dict[str, Any]] = Field(min_length=1, max_length=50,
+                                                   description="One or more response bodies; include different decisions if you can")
+
+
+@router.post("/connections/suggest-mapping")
+def suggest(body: SuggestIn, p: Principal = Depends(require("connection.manage"))):
+    """Draft a field mapping from sample payloads. Nothing is saved or called; review the draft,
+    then save it on a connection and verify the connection as usual."""
+    try:
+        return suggest_mapping(body.sample_request, body.sample_responses)
+    except MappingError as e:
+        raise invalid(str(e)) from e
