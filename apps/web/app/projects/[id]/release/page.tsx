@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useParams, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
+import { EvidencePacks } from "@/components/EvidencePacks";
 import { RegulatoryMapping } from "@/components/RegulatoryMapping";
 import { Badge, Button, Card, Empty, ErrorBox, Field, Loading, Mono, OutcomeBanner, PageHeader, Select, Table, Td, inputCls, useApi } from "@/components/ui";
 import { ApiError, api, download } from "@/lib/api";
@@ -140,6 +141,7 @@ function ReleaseInner() {
                 <p className="mt-2 text-xs text-slate-500">Reports are sensitive. Every download is audit-logged and checksum-verified. Regenerating a report never changes the recorded results.</p>
               </div>
             </Card>
+            <EvidencePacks runId={run.id} runNumber={run.run_number} completed={run.status === "COMPLETED"} onCreated={reports.reload} />
           </div>
         </div>
       )}

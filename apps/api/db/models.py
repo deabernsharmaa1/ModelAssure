@@ -342,6 +342,23 @@ class Artifact(Base):
     created_at: Mapped[datetime] = created()
 
 
+class SigningKey(Base):
+    """Per-organisation Ed25519 key used to sign evidence packs. The private key lives in the
+    secret store; only its reference is kept here. Retired keys stay listed so older packs remain
+    attributable."""
+    __tablename__ = "signing_keys"
+    id: Mapped[uuid.UUID] = pk()
+    organization_id: Mapped[uuid.UUID] = org_fk()
+    algorithm: Mapped[str] = mapped_column(String(20), nullable=False, server_default="Ed25519")
+    public_key_pem: Mapped[str] = mapped_column(Text, nullable=False)
+    fingerprint: Mapped[str] = mapped_column(String(64), nullable=False, unique=True)
+    secret_ref: Mapped[str] = mapped_column(String(200), nullable=False)
+    status: Mapped[str] = mapped_column(String(20), nullable=False, server_default="ACTIVE")  # ACTIVE | RETIRED
+    created_by: Mapped[uuid.UUID | None] = user_fk()
+    created_at: Mapped[datetime] = created()
+    retired_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
 class AuditEvent(Base):
     __tablename__ = "audit_events"
     __table_args__ = (UniqueConstraint("organization_id", "seq"),)
@@ -391,5 +408,5 @@ class IdempotencyKey(Base):
 TENANT_TABLES = [
     "systems", "system_versions", "projects", "connections", "datasets", "policy_sets", "policies",
     "test_suites", "test_cases", "test_runs", "test_executions", "findings", "finding_executions",
-    "reviews", "artifacts", "audit_events", "idempotency_keys",
+    "reviews", "artifacts", "audit_events", "idempotency_keys", "signing_keys",
 ]

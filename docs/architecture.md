@@ -51,6 +51,7 @@ A modular monolith with isolated background workers (spec §5).
 | Egress | Only hosts on the platform allowlist (and the organisation's approved destinations); http(s) only; no URL credentials; metadata, link-local, multicast and unspecified addresses always blocked; https required in production; redirects never followed; `SANDBOX` environment only. ModelAssure never discovers endpoints. |
 | No code execution | Policies and mappings are validated data. Customer code is never run (packaged-model execution is a later, isolated-worker feature). |
 | Evidence integrity | Executions, suites, cases, versions, reviews and artifacts are append-only (triggers). Evidence and reports are SHA-256 hashed and re-verified on read. Reports carry a results digest that is stable across regeneration. |
+| Evidence packs | A signed manifest (Ed25519, per-organisation key in the secret store, key material immutable) lists the SHA-256 of every file; a standalone verifier ships in each pack. Secrets and endpoints are redacted; raw case evidence is opt-in. |
 | Audit | Hash-chained per organisation, append-only (trigger + `REVOKE UPDATE, DELETE`), verifiable via `GET /v1/audit-events/verify`. Tampering by a DBA is detected (tested). |
 | Data protection | Encryption at rest for objects and secrets; request bodies are never logged; CSV exports exclude inputs; raw evidence retention purge. |
 

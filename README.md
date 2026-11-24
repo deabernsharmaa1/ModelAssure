@@ -112,7 +112,7 @@ Password for all: `ModelAssure!2026`
 ## Tests
 
 ```bash
-pytest                                # 191 tests: unit, contract, integration, security, end-to-end
+pytest                                # 198 tests: unit, contract, integration, security, end-to-end
 python scripts/ui_smoke.py            # browser workflow (needs the running stack, Chrome, Playwright)
 (cd apps/web && npm run build)        # type-checks and builds the frontend
 ```
@@ -136,6 +136,26 @@ infrastructure/      Alembic migrations (schema, RLS, immutability) and Docker f
 scripts/             seed, demo, load_demo, dev_up/down, ui_smoke, purge_evidence
 docs/                architecture, policy language, decisions, spec traceability
 ```
+
+## Beyond the specification
+
+Added after market research (see [decisions](docs/decisions.md#11-additions-after-market-research)):
+
+- **Regulatory mapping**: each run's evidence mapped to BNM's AI feedback statement, RMiT and MAS's
+  AI risk guidelines, on the release screen and in the report. Not a compliance opinion.
+- **Faster onboarding**: policy templates (SME lending; consumer credit / BNPL affordability) whose
+  thresholds you fill in, a mapping helper that drafts the field mapping from sample payloads, and a
+  setup checklist on each project.
+- **Signed evidence packs**: one zip a vendor or lender can hand to a bank, auditor or supervisor,
+  verifiable offline:
+
+  ```bash
+  pip install cryptography
+  python3 verify_pack.py modelassure-run-1001-evidence-pack-v1.zip --expect-fingerprint <fingerprint>
+  ```
+
+  `verify_pack.py` is inside every pack. Get the fingerprint from the issuer separately
+  (`GET /v1/signing-keys`, or the release screen).
 
 ## Documentation
 

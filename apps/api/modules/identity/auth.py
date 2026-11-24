@@ -46,6 +46,9 @@ PERMISSIONS: dict[str, set[str]] = {
     "release.review": {"REVIEWER"},
     "report.read": set(ROLES),
     "audit.read": {"AUDITOR", "ADMIN", "RISK_MANAGER"},
+    # Packs leave the organisation, so the people who build the system do not issue them.
+    "evidence_pack.create": {"ADMIN", "RISK_MANAGER", "REVIEWER", "AUDITOR"},
+    "signing_key.manage": {"ADMIN"},
     "user.read": set(ROLES),
 }
 PRIVILEGED = {"policy.approve", "finding.accept_risk", "release.review", "finding.close"}

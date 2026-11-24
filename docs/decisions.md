@@ -100,6 +100,37 @@ evidence in encrypted object storage; findings link to many executions; added `j
 - **Retention.** `scripts/purge_evidence.py` deletes raw request/response payloads after the
   institution's retention period while keeping outcomes and hashes; the purge is audit-logged.
 
+## 11. Additions after market research
+
+Market research showed that the buyers' pain is passing supervisory scrutiny and proving that
+vendor updates were tested, more than running tests. Four additions follow from that.
+
+- **Regulatory mapping** (`modules/compliance/`). Each control in BNM's AI feedback statement,
+  RMiT and MAS's AI risk guidelines is checked against the run's own evidence (MET / PARTIAL /
+  NOT_MET / NO_EVIDENCE). Controls only partly provable by testing are capped at PARTIAL. It is
+  labelled as not a legal or compliance opinion. The AICB AI MRM framework has a slot for when it
+  is published; nothing is claimed for it now.
+- **Faster onboarding.** Policy templates ship with every threshold empty (`PARAMETER_NOT_SET`
+  blocks submission), preserving "ModelAssure never invents thresholds". The mapping helper
+  maps only what it can see in samples, flags fields whose value shape differs, and never maps an
+  unseen decision value (an unmapped value at run time is an ERROR, never a pass). The consumer
+  credit profile has no simulator behind it; it is tested at unit and API level.
+- **Signed evidence packs** (`modules/evidence/`). A zip with a manifest of SHA-256 hashes signed
+  with a per-organisation Ed25519 key, the public key, and a standalone verifier that needs only
+  `cryptography`. Design choices:
+  - The private key sits in the secret store; the table keeps a reference, and a trigger makes key
+    material immutable. Rotation retires the old key, which stays listed, so earlier packs remain
+    attributable.
+  - Recipients must check the key fingerprint against one obtained separately: a pack re-signed
+    with another key is internally consistent, and the verifier says so only if you pass
+    `--expect-fingerprint` (tested).
+  - The pack says plainly what it proves (origin and integrity) and what it does not (that the
+    tests were adequate or ran against the recipient's system).
+  - The run configuration is redacted (secret references removed, endpoints replaced by hashes).
+    Case-level raw evidence is excluded by default because it can contain applicant data.
+  - Packs leave the organisation, so they are issued by Risk Managers, Reviewers, Auditors and
+    Admins, not by the Engineers and Analysts who build and test the system.
+
 ## Not in Version 1 (per spec §1.4 and §16)
 
 Model training, credit-bureau integrations, real-time fraud prevention, insurance, AI-agent

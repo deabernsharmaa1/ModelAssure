@@ -76,7 +76,8 @@ def create_report(run_id: str, p: Principal = Depends(require("report.read")), d
 @router.get("/runs/{run_id}/reports")
 def list_reports(run_id: str, p: Principal = Depends(require("report.read")), db: Session = Depends(tenant_db)):
     run = get_or_404(db, TestRun, run_id, "run")
-    return [row(a) for a in db.scalars(select(Artifact).where(Artifact.run_id == run.id).order_by(Artifact.version, Artifact.type))]
+    return [row(a) for a in db.scalars(select(Artifact).where(Artifact.run_id == run.id, Artifact.type.like("REPORT_%"))
+                                       .order_by(Artifact.version, Artifact.type))]
 
 
 @router.get("/runs/{run_id}/report")
@@ -110,10 +111,8 @@ CSV_FIELDS = ["case_key", "category", "result", "baseline_decision", "candidate_
               "violated_rules", "failure_types", "error_type", "trace_id", "evidence_hash"]
 
 
-@router.get("/runs/{run_id}/executions.csv")
-def export_csv(run_id: str, p: Principal = Depends(require("report.read")), db: Session = Depends(tenant_db)):
-    """Permitted outcomes only: no applicant inputs or raw responses leave via CSV."""
-    run = get_or_404(db, TestRun, run_id, "run")
+def outcomes_csv(db: Session, run: TestRun) -> str:
+    """Permitted outcomes only: no applicant inputs or raw responses."""
     buf = io.StringIO()
     w = csv.DictWriter(buf, fieldnames=CSV_FIELDS)
     w.writeheader()
@@ -123,7 +122,15 @@ def export_csv(run_id: str, p: Principal = Depends(require("report.read")), db: 
                     "changed": e.changed, "change_class": e.change_class or "", "violated_rules": ";".join(e.violated_rules),
                     "failure_types": ";".join(e.failure_types), "error_type": e.error_type or "", "trace_id": e.trace_id or "",
                     "evidence_hash": e.evidence_hash})
+    return buf.getvalue()
+
+
+@router.get("/runs/{run_id}/executions.csv")
+def export_csv(run_id: str, p: Principal = Depends(require("report.read")), db: Session = Depends(tenant_db)):
+    """Permitted outcomes only: no applicant inputs or raw responses leave via CSV."""
+    run = get_or_404(db, TestRun, run_id, "run")
+    data = outcomes_csv(db, run)
     record_for(db, p, "report.export_csv", "test_run", run.id)
     db.commit()
-    return Response(buf.getvalue(), media_type="text/csv",
+    return Response(data, media_type="text/csv",
                     headers={"Content-Disposition": f'attachment; filename="modelassure-run-{run.run_number}-outcomes.csv"'})

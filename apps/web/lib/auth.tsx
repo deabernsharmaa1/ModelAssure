@@ -56,4 +56,5 @@ export const CAN = {
   closeFinding: ["RISK_MANAGER", "ADMIN"] as Role[],
   review: ["REVIEWER"] as Role[],
   audit: ["AUDITOR", "ADMIN", "RISK_MANAGER"] as Role[],
+  evidencePack: ["ADMIN", "RISK_MANAGER", "REVIEWER", "AUDITOR"] as Role[],
 };
