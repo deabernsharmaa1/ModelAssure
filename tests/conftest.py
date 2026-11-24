@@ -3,6 +3,16 @@ simulator) as real HTTP processes on free ports."""
 from __future__ import annotations
 
 import os
+import tempfile
+
+# Integration tests always use a dedicated test database and temporary storage. These must be
+# set before anything imports `settings` (it is cached).
+_TMP = tempfile.mkdtemp(prefix="modelassure-test-")
+os.environ.setdefault("MA_DATABASE_URL", "postgresql+psycopg://modelassure_app:modelassure_app@localhost:5432/modelassure_test")
+os.environ.setdefault("MA_MIGRATION_DATABASE_URL", "postgresql+psycopg://modelassure:modelassure@localhost:5432/modelassure_test")
+os.environ.setdefault("MA_STORAGE_PATH", os.path.join(_TMP, "objects"))
+os.environ.setdefault("MA_SECRET_STORE_PATH", os.path.join(_TMP, "secrets"))
+os.environ.setdefault("MA_ENVIRONMENT", "test")
 import socket
 import subprocess
 import sys
@@ -69,3 +79,68 @@ def simulators():
                 p.wait(timeout=5)
             except subprocess.TimeoutExpired:
                 p.kill()
+
+
+# ---------------------------------------------------------------------------------------------
+# Database + API fixtures
+# ---------------------------------------------------------------------------------------------
+PASSWORD = "Test-Password-1"
+
+
+@pytest.fixture(scope="session")
+def database():
+    from alembic import command
+    from alembic.config import Config
+
+    cfg = Config(str(ROOT / "alembic.ini"))
+    cfg.set_main_option("script_location", str(ROOT / "infrastructure/migrations"))
+    command.downgrade(cfg, "base")
+    command.upgrade(cfg, "head")
+    from scripts.seed import seed
+
+    orgs = seed(PASSWORD, os.environ["MA_MIGRATION_DATABASE_URL"])
+    return {"orgs": orgs, "owner_url": os.environ["MA_MIGRATION_DATABASE_URL"]}
+
+
+class Api:
+    def __init__(self, client):
+        self.client = client
+        self._tokens: dict[str, str] = {}
+
+    def token(self, email: str) -> str:
+        if email not in self._tokens:
+            r = self.client.post("/v1/auth/login", json={"email": email, "password": PASSWORD})
+            assert r.status_code == 200, r.text
+            self._tokens[email] = r.json()["access_token"]
+        return self._tokens[email]
+
+    def as_(self, who: str):
+        email = who if "@" in who else f"{who}@tanjung.example"
+        return _As(self.client, {"Authorization": f"Bearer {self.token(email)}"})
+
+
+class _As:
+    def __init__(self, client, headers):
+        self.c, self.h = client, headers
+
+    def get(self, url, **kw):
+        return self.c.get(url, headers={**self.h, **kw.pop("headers", {})}, **kw)
+
+    def post(self, url, **kw):
+        return self.c.post(url, headers={**self.h, **kw.pop("headers", {})}, **kw)
+
+    def patch(self, url, **kw):
+        return self.c.patch(url, headers={**self.h, **kw.pop("headers", {})}, **kw)
+
+    def put(self, url, **kw):
+        return self.c.put(url, headers={**self.h, **kw.pop("headers", {})}, **kw)
+
+
+@pytest.fixture(scope="session")
+def api(database):
+    from fastapi.testclient import TestClient
+
+    from main import create_app
+
+    with TestClient(create_app()) as client:
+        yield Api(client)

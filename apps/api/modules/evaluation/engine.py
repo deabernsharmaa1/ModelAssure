@@ -96,6 +96,9 @@ def _side_error(obs: Observation | None) -> dict[str, Any] | None:
         return {"type": "NOT_EXECUTED", "detail": "no observation"}
     if obs.status == "ERROR":
         return {"type": obs.error_type or "ERROR", "detail": obs.error_detail, "http_status": obs.http_status}
+    if obs.status == "REJECTED":
+        # A valid request rejected with 4xx: the system could not be evaluated for this case.
+        return {"type": "REQUEST_REJECTED", "detail": obs.error_detail, "http_status": obs.http_status}
     return None
 
 
