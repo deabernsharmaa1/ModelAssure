@@ -5,8 +5,8 @@
 <title>ModelAssure release assurance report — run #{{ r.run.run_number }}</title>
 <style>
   @page { size: A4; margin: 18mm 16mm 20mm 16mm;
-          @bottom-left { content: "ModelAssure · Run #{{ r.run.run_number }} · Report v{{ r.report_version }} · Confidential"; font-size: 8pt; color: #666; }
-          @bottom-right { content: "Page " counter(page) " of " counter(pages); font-size: 8pt; color: #666; } }
+          @bottom-left { content: "ModelAssure · Run #{{ r.run.run_number }} · Report v{{ r.report_version }} · Confidential"; font-family: "DejaVu Sans", Arial, sans-serif; font-size: 8pt; color: #666; }
+          @bottom-right { content: "Page " counter(page) " of " counter(pages); font-family: "DejaVu Sans", Arial, sans-serif; font-size: 8pt; color: #666; } }
   body { font-family: "DejaVu Sans", Arial, sans-serif; font-size: 9.5pt; color: #1c2430; line-height: 1.4; }
   h1 { font-size: 18pt; margin: 0 0 2mm; color: #0b2545; }
   h2 { font-size: 12.5pt; color: #0b2545; border-bottom: 1.5px solid #0b2545; padding-bottom: 1mm; margin: 7mm 0 3mm; }
@@ -87,7 +87,7 @@
 {% for g in d.unexpected_change_groups %}<tr><td>{{ g.finding }}</td><td>{{ g.title }}</td><td>{{ g.cases }}</td><td>{{ g.status }}</td></tr>{% endfor %}</table>{% endif %}
 {% if d.dependency_behaviour %}<h3>Behaviour under dependency failures</h3>
 <table><tr><th>Injected fault</th><th>Cases</th><th>Baseline decisions</th><th>Candidate decisions</th><th>Failed</th></tr>
-{% for x in d.dependency_behaviour %}<tr><td>{{ x.fault }}</td><td>{{ x.cases }}</td><td>{{ x.baseline_decisions }}</td><td>{{ x.candidate_decisions }}</td><td>{{ x.failed }}</td></tr>{% endfor %}</table>{% endif %}
+{% for x in d.dependency_behaviour %}<tr><td>{{ x.fault }}</td><td>{{ x.cases }}</td><td>{{ x.baseline_decisions|counts }}</td><td>{{ x.candidate_decisions|counts }}</td><td>{{ x.failed }}</td></tr>{% endfor %}</table>{% endif %}
 
 <h2>5. Policy violations</h2>
 {% if not r.policy_violations %}<p>No policy violations were found.</p>{% endif %}
@@ -95,8 +95,8 @@
 <h3>{{ v.finding }} · <span class="sev-{{ v.severity }}">{{ v.severity }}</span> · {{ v.title }}</h3>
 <table>
   <tr><th>Rules</th><td>{{ v.rules|join(", ") }}</td><th>Status</th><td>{{ v.status }}</td></tr>
-  <tr><th>Affected cases</th><td>{{ v.affected_cases }}</td><th>Expected</th><td>{{ v.expected }}</td></tr>
-  <tr><th>Observed</th><td colspan="3">{{ v.observed }}</td></tr>
+  <tr><th>Affected cases</th><td>{{ v.affected_cases }}</td><th>Expected</th><td>{{ v.expected|counts }}</td></tr>
+  <tr><th>Observed</th><td colspan="3">{{ v.observed|counts }}</td></tr>
   <tr><th>Reproduce with</th><td colspan="3" class="mono">{{ v.reproducible_cases|join(", ") }}</td></tr>
   {% if v.suspected_cause %}<tr><th>Suspected cause</th><td colspan="3">{{ v.suspected_cause }}</td></tr>{% endif %}
 </table>

@@ -25,6 +25,16 @@ _env = Environment(loader=FileSystemLoader(str(Path(__file__).parent / "template
                    autoescape=select_autoescape(["html"]))
 
 
+def _counts(d) -> str:
+    """{'APPROVE': 27, 'REFER': 6} → 'APPROVE ×27 · REFER ×6'"""
+    if not isinstance(d, dict) or not d:
+        return "—"
+    return " · ".join(f"{k} ×{v}" for k, v in sorted(d.items(), key=lambda kv: -kv[1]))
+
+
+_env.filters["counts"] = _counts
+
+
 def render_pdf(report: dict) -> bytes:
     from weasyprint import HTML
 

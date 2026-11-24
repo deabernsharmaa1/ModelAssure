@@ -79,6 +79,9 @@ class Policy:
     @property
     def expected_text(self) -> str:
         if self.allowed != ALL_DECISIONS:
+            excluded = sorted(ALL_DECISIONS - self.allowed, key=DECISIONS.index)
+            if len(excluded) == 1:
+                return f"not {excluded[0]}"
             vals = sorted(self.allowed, key=DECISIONS.index)
             return vals[0] if len(vals) == 1 else " or ".join(vals)
         return node_to_text(self.assertion)

@@ -13,46 +13,15 @@ os.environ.setdefault("MA_MIGRATION_DATABASE_URL", "postgresql+psycopg://modelas
 os.environ.setdefault("MA_STORAGE_PATH", os.path.join(_TMP, "objects"))
 os.environ.setdefault("MA_SECRET_STORE_PATH", os.path.join(_TMP, "secrets"))
 os.environ.setdefault("MA_ENVIRONMENT", "test")
-import socket
 import subprocess
-import sys
-import time
 from pathlib import Path
 
-import httpx
 import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def free_port() -> int:
-    with socket.socket() as s:
-        s.bind(("127.0.0.1", 0))
-        return s.getsockname()[1]
-
-
-def _wait(url: str, proc: subprocess.Popen, timeout: float = 20) -> None:
-    deadline = time.time() + timeout
-    while time.time() < deadline:
-        if proc.poll() is not None:
-            raise RuntimeError(f"process for {url} exited early: {proc.stderr.read().decode() if proc.stderr else ''}")
-        try:
-            if httpx.get(url, timeout=0.5).status_code == 200:
-                return
-        except httpx.HTTPError:
-            pass
-        time.sleep(0.1)
-    raise RuntimeError(f"timed out waiting for {url}")
-
-
-def start_uvicorn(app: str, port: int, env: dict[str, str] | None = None) -> subprocess.Popen:
-    full_env = {**os.environ, "PYTHONPATH": f"{ROOT / 'apps/api'}:{ROOT}", **(env or {})}
-    proc = subprocess.Popen(
-        [sys.executable, "-m", "uvicorn", app, "--host", "127.0.0.1", "--port", str(port), "--log-level", "warning"],
-        cwd=ROOT, env=full_env, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE,
-    )
-    _wait(f"http://127.0.0.1:{port}/health", proc)
-    return proc
+from scripts.sim_processes import free_port, start_uvicorn  # noqa: E402
 
 
 @pytest.fixture(scope="session")

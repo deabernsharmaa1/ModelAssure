@@ -35,7 +35,7 @@ def findings(api, run_id, **params):
 
 
 def by_rule(items, rule):
-    return next(f for f in items if rule in f["rule_ids"])
+    return next(f for f in items if f["rule_ids"] and f["rule_ids"][0] == rule)
 
 
 # ---- findings and assessment of the defective release ----------------------------------------------
@@ -53,7 +53,9 @@ def test_findings_grouped_with_evidence_and_suspected_cause(api, flow):
     assert pol1["severity"] == "CRITICAL" and pol1["status"] == "OPEN" and pol1["affected_count"] > 0
     assert "BUREAU_DEFAULT_SCORE_APPLIED" in pol1["suspected_cause"]
     pol2 = by_rule(items, "POL-002")
-    assert set(pol2["rule_ids"]) == {"POL-002", "CHG-002"}  # one finding for one failure signature
+    # One finding per root cause: the primary rule leads, every co-violated rule is listed.
+    assert pol2["rule_ids"][0] == "POL-002" and "CHG-002" in pol2["rule_ids"]
+    assert sum("POL-002" in f["rule_ids"] for f in items) == 1
     assert "FRAUD_ALERT_OVERRIDDEN_PRIME" in pol2["suspected_cause"]
     assert any(f["type"] == "UNEXPECTED_CHANGE" for f in items)
     detail = api.as_("analyst").get(f"/v1/findings/{pol1['id']}").json()

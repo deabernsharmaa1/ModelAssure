@@ -1,7 +1,8 @@
 """Group related failures into findings (Module F) and apply retest outcomes.
 
 Grouping key ("signature"):
-  FAIL           sorted set of violated rules            → POLICY_VIOLATION / CHANGE_CONTROL_VIOLATION / ...
+  FAIL           primary violated rule (precedence, then  → POLICY_VIOLATION / CHANGE_CONTROL_VIOLATION / ...
+                 severity); other violated rules are listed
   ERROR          error type                              → TECHNICAL_ERROR
   INCONCLUSIVE   first reason (normalised)               → INCONCLUSIVE
   CHANGED/UNEXP. baseline→candidate transition           → UNEXPECTED_CHANGE
@@ -49,6 +50,17 @@ def _suspected_cause(execs: list[TestExecution]) -> str | None:
     return None
 
 
+def _primary_rule(e: TestExecution, cps) -> str | None:
+    """The violated policy that matters most for this case (highest precedence, then severity).
+    Cases sharing a primary rule share a root cause and become one finding; every other rule they
+    violate is listed on the finding."""
+    policies = [cps.by_id(r) for r in e.violated_rules if cps.by_id(r) is not None]
+    if policies:
+        return min(policies, key=lambda p: (-p.precedence, SEV_RANK[p.severity], p.policy_id)).policy_id
+    controls = sorted(r for r in e.violated_rules if any(c.rule_id == r for c in cps.change_controls))
+    return controls[0] if controls else None
+
+
 def group_findings(db: Session, run: TestRun) -> list[Finding]:
     snap = run.config_snapshot
     cps = compile_policy_set(snap["policy_sets"]["candidate"]["content"])
@@ -58,7 +70,7 @@ def group_findings(db: Session, run: TestRun) -> list[Finding]:
         if e.result == "FAIL":
             ftype = next((t for t in ("POLICY_VIOLATION", "CHANGE_CONTROL_VIOLATION") if t in e.failure_types),
                          (e.failure_types or ["POLICY_VIOLATION"])[0])
-            groups[(ftype, "+".join(sorted(e.violated_rules)) or ftype)].append(e)
+            groups[(ftype, _primary_rule(e, cps) or ftype)].append(e)
         elif e.result == "ERROR":
             groups[("TECHNICAL_ERROR", e.error_type or "ERROR")].append(e)
         elif e.result == "INCONCLUSIVE":
@@ -102,13 +114,10 @@ def group_findings(db: Session, run: TestRun) -> list[Finding]:
 def _describe(ftype: str, sig: str, items: list[TestExecution], cps) -> tuple[str, str, list[str]]:
     sev_rules = cps.severity_rules
     if ftype in ("POLICY_VIOLATION", "CHANGE_CONTROL_VIOLATION") or ftype in FAILING_TYPES:
-        rules = sig.split("+") if sig else []
+        all_rules = sorted({r for e in items for r in e.violated_rules if r not in FAILING_TYPES})
+        rules = [sig] + [r for r in all_rules if r != sig] if sig in all_rules else all_rules
         sevs = [v.get("severity") for e in items for v in e.detail.get("violations", [])]
-        primary = None
-        for r in rules:
-            p = cps.by_id(r)
-            if p and (primary is None or SEV_RANK[p.severity] < SEV_RANK[primary.severity]):
-                primary = p
+        primary = cps.by_id(sig)
         if primary is not None:
             title = primary.description or primary.policy_id
         else:
