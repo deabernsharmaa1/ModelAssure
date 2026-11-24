@@ -1,0 +1,22 @@
+# Runtime dependencies, pinned to the versions the test suite was run against.
+alembic==1.20.1
+boto3==1.44.10
+cryptography==50.0.1
+fastapi==0.165.0
+httpx==0.28.1
+hypothesis==6.170.17
+Jinja2==3.1.6
+numpy==2.5.3
+opentelemetry-api==1.45.2
+opentelemetry-sdk==1.45.2
+pandas==3.0.5
+pandera==0.36.0
+psycopg[binary]==3.3.9
+pydantic==2.13.5
+pydantic-settings==2.16.3
+PyJWT==2.15.0
+python-multipart==0.0.32
+scipy==1.18.1
+SQLAlchemy==2.1.9
+uvicorn[standard]==0.54.0
+weasyprint==70.0

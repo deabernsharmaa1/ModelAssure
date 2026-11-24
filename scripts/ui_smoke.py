@@ -1,7 +1,7 @@
 """Browser smoke test: drives the remediation workflow through the UI only (no API shortcuts).
 
 Prerequisites: the full stack running locally (see README "Run locally"), Google Chrome, Playwright
-(`pip install playwright`), and a fresh project + defective run created by `python scripts/ui_seed.py`,
+(`pip install playwright`), and a fresh project + defective run created by `python scripts/load_demo.py`,
 which writes the ids to /tmp/ui_ids.txt.
 
     python scripts/ui_smoke.py
@@ -34,11 +34,14 @@ with sync_playwright() as p:
     eng.wait_for_timeout(500); eng.screenshot(path=SHOTS + "/evidence.png", full_page=False)
     eng.keyboard.press("Escape")
     eng.goto(f"{B}/projects/{pid}/findings"); eng.wait_for_load_state("networkidle")
-    for key in ("F-1", "F-2", "F-3"):
-        eng.locator("li button", has_text=key).first.click(); eng.wait_for_timeout(600)
+    critical = eng.locator("li button", has_text="CRITICAL")
+    n_critical = critical.count()
+    assert n_critical == 3, f"expected 3 critical findings, got {n_critical}"
+    for i in range(n_critical):
+        critical.nth(i).click(); eng.wait_for_timeout(600)
         for label in ("Move to investigating", "Move to fix proposed", "Move to ready for retest"):
             eng.get_by_role("button", name=label).click(); eng.wait_for_timeout(700)
-        expect(eng.locator("li button", has_text=key).first).to_contain_text("READY FOR RETEST")
+        expect(critical.nth(i)).to_contain_text("READY FOR RETEST")
     # 2. Retest via the button and modal, against 3.2.1
     eng.get_by_role("button", name="Retest 3 ready findings").click()
     dialog = eng.get_by_role("dialog")
@@ -47,7 +50,7 @@ with sync_playwright() as p:
     eng.wait_for_url("**/runs/*"); expect(eng.get_by_text("COMPLETED").first).to_be_visible(timeout=60000)
     eng.wait_for_timeout(1500); eng.screenshot(path=SHOTS + "/retest-run.png", full_page=True)
     eng.goto(f"{B}/projects/{pid}/findings?run={rid}"); eng.wait_for_load_state("networkidle"); eng.wait_for_timeout(800)
-    assert eng.locator("li button", has_text="RESOLVED").count() == 3, "findings not resolved"
+    expect(eng.locator("li button", has_text="RESOLVED")).to_have_count(3, timeout=15000)
     # 3. Analyst queues a full run on 3.2.1 via the modal
     an = login(b, "analyst")
     an.goto(f"{B}/projects/{pid}/runs"); an.wait_for_load_state("networkidle")

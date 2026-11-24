@@ -1,0 +1,85 @@
+# ModelAssure ReleaseGate — local / demo stack.
+#   docker compose up --build
+#   open http://localhost:3000   (demo users: see README; password ModelAssure!2026)
+#
+# Development defaults only. For any shared environment, change every secret below, set
+# MA_ENVIRONMENT=production, use MA_AUTH_MODE=oidc and an S3 bucket with server-side encryption.
+
+x-python: &python
+  build: { context: ., dockerfile: infrastructure/docker/python.Dockerfile }
+  image: modelassure-python:1.0.0
+
+x-ma-env: &ma-env
+  MA_DATABASE_URL: postgresql+psycopg://modelassure_app:modelassure_app@postgres:5432/modelassure
+  MA_MIGRATION_DATABASE_URL: postgresql+psycopg://modelassure:modelassure@postgres:5432/modelassure
+  MA_ENVIRONMENT: development
+  MA_AUTH_MODE: dev
+  MA_JWT_SECRET: change-me-dev-only-secret-at-least-32-bytes!
+  MA_STORAGE_PATH: /data/objects
+  MA_SECRET_STORE_PATH: /data/secrets
+  MA_STORAGE_ENCRYPTION_KEY: ${MA_STORAGE_ENCRYPTION_KEY:-q8C3n0e0b3dZ9b4kH6x1xg4M3y9Jf2Qk5V7s8P1r2Tw=}
+  MA_ALLOWED_TEST_HOSTS: localhost,127.0.0.1,simulator-baseline,simulator-candidate,dependency-simulator
+  MA_CORS_ORIGINS: http://localhost:3000
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment: { POSTGRES_USER: modelassure, POSTGRES_PASSWORD: modelassure, POSTGRES_DB: modelassure }
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./infrastructure/docker/postgres-init.sql:/docker-entrypoint-initdb.d/10-app-role.sql:ro
+    healthcheck: { test: ["CMD-SHELL", "pg_isready -U modelassure"], interval: 3s, timeout: 3s, retries: 20 }
+
+  migrate:
+    <<: *python
+    environment: *ma-env
+    command: ["sh", "-c", "alembic upgrade head && python scripts/seed.py"]
+    depends_on: { postgres: { condition: service_healthy } }
+    restart: "no"
+
+  api:
+    <<: *python
+    environment: *ma-env
+    ports: ["8000:8000"]
+    volumes: [objects:/data]
+    depends_on: { migrate: { condition: service_completed_successfully } }
+    healthcheck: { test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"], interval: 5s, retries: 20 }
+
+  worker:
+    <<: *python
+    environment: *ma-env
+    command: ["python", "-m", "workers.executor.main"]
+    volumes: [objects:/data]
+    depends_on: { migrate: { condition: service_completed_successfully } }
+    deploy: { replicas: 1 }
+
+  # ---- Fictional bank (demo only) ---------------------------------------------------------
+  dependency-simulator:
+    <<: *python
+    command: ["uvicorn", "workers.simulators.dependency_mock.app:app", "--host", "0.0.0.0", "--port", "8200"]
+    environment: { DEPENDENCY_TIMEOUT_SLEEP_S: "2.0" }
+    ports: ["8200:8200"]
+
+  simulator-baseline:
+    <<: *python
+    command: ["uvicorn", "decision_simulator.baseline_api.app:app", "--host", "0.0.0.0", "--port", "8101"]
+    environment: { DEPENDENCY_URL: http://dependency-simulator:8200, DEPENDENCY_TIMEOUT_S: "0.4" }
+    ports: ["8101:8101"]
+
+  simulator-candidate:
+    <<: *python
+    command: ["uvicorn", "decision_simulator.candidate_api.app:app", "--host", "0.0.0.0", "--port", "8102"]
+    environment: { DEPENDENCY_URL: http://dependency-simulator:8200, DEPENDENCY_TIMEOUT_S: "0.4" }
+    ports: ["8102:8102"]
+
+  web:
+    build:
+      context: .
+      dockerfile: infrastructure/docker/web.Dockerfile
+      args: { NEXT_PUBLIC_API_URL: http://localhost:8000 }
+    ports: ["3000:3000"]
+    depends_on: [api]
+
+volumes:
+  pgdata:
+  objects:

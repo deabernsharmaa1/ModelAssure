@@ -29,7 +29,11 @@ export function EvidenceModal({ runId, executionId, onClose }: { runId: string; 
   return (
     <Modal open={!!executionId} onOpenChange={(o) => !o && onClose()} wide title={e ? `Case ${e.case_key}` : "Case evidence"}
            description="Reproducible evidence: re-send the same request to the same versions to reproduce this outcome.">
-      {ev.loading ? <Loading /> : !e ? <ErrorBox error={ev.error} /> : (
+      {ev.loading ? <Loading /> : !e ? <ErrorBox error={ev.error} /> : !e.evidence ? (
+        <p className="text-sm text-slate-700">Raw evidence for this case was deleted under the retention policy. The recorded outcome
+          (<b>{e.result}</b>, baseline {e.baseline_decision ?? "—"} → candidate {e.candidate_decision ?? "—"}) and its evidence hash
+          <Mono> {short(e.evidence_integrity.sha256, 16)}</Mono> remain.</p>
+      ) : (
         <div className="space-y-4">
           <div className="flex flex-wrap items-center gap-3 text-sm">
             <Badge value={e.result} /> {e.change_class && <Badge value={e.change_class} />}

@@ -151,6 +151,16 @@ def get_execution(run_id: str, execution_id: str, p: Principal = Depends(require
     e = get_or_404(db, TestExecution, execution_id, "execution")
     if str(e.run_id) != run_id:
         raise not_found("execution")
-    raw = get_storage().get(e.evidence_ref)
+    try:
+        raw = get_storage().get(e.evidence_ref)
+    except (FileNotFoundError, KeyError):
+        # Raw payloads were removed under the retention policy; the hash and outcome remain.
+        return {**row(e), "evidence": None,
+                "evidence_integrity": {"sha256": e.evidence_hash, "verified": False, "purged": True}}
+    except Exception as exc:  # e.g. S3 NoSuchKey
+        if "NoSuchKey" in type(exc).__name__ or "NoSuchKey" in str(exc):
+            return {**row(e), "evidence": None,
+                    "evidence_integrity": {"sha256": e.evidence_hash, "verified": False, "purged": True}}
+        raise
     intact = sha256_hex(raw) == e.evidence_hash
-    return {**row(e), "evidence": json.loads(raw), "evidence_integrity": {"sha256": e.evidence_hash, "verified": intact}}
+    return {**row(e), "evidence": json.loads(raw), "evidence_integrity": {"sha256": e.evidence_hash, "verified": intact, "purged": False}}

@@ -106,3 +106,23 @@ def test_simulator_rejects_invalid_input_safely():
 
 def test_simulator_requires_api_key():
     assert baseline_client.post("/3.1.0/decisions", json={}).status_code == 401
+
+
+@pytest.mark.parametrize("key", ["../../escape", "a/b", "x" * 101, "bad key", ".hidden"])
+def test_unsafe_fixture_case_keys_rejected(key):
+    from modules.scenarios.generators import GenerationError
+
+    cfg = {"generators": [{"type": "fixtures", "cases": [{"case_key": key, "input": {"case_id": "c"}}]}]}
+    with pytest.raises(GenerationError):
+        generate_suite(cfg, [])
+
+
+def test_production_refuses_development_settings():
+    from main import _check_production_safety
+    from settings import Settings
+
+    with pytest.raises(RuntimeError, match="MA_AUTH_MODE"):
+        _check_production_safety(Settings(environment="production", auth_mode="dev"))
+    _check_production_safety(Settings(environment="production", auth_mode="oidc",
+                                      jwt_secret="a-real-secret-value-from-a-vault-123456",
+                                      storage_encryption_key="k"))

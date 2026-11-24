@@ -1,0 +1,39 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  api:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env: { POSTGRES_USER: modelassure, POSTGRES_PASSWORD: modelassure, POSTGRES_DB: modelassure }
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U modelassure" --health-interval 5s --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - name: System libraries for PDF reports
+        run: sudo apt-get update && sudo apt-get install -y libpango-1.0-0 libpangoft2-1.0-0 fonts-dejavu-core
+      - name: Database roles
+        env: { PGPASSWORD: modelassure }
+        run: |
+          psql -h localhost -U modelassure -c "CREATE ROLE modelassure_app LOGIN PASSWORD 'modelassure_app';"
+          psql -h localhost -U modelassure -c "CREATE DATABASE modelassure_test OWNER modelassure;"
+      - run: pip install -r requirements-dev.txt
+      - run: pytest
+
+  web:
+    runs-on: ubuntu-latest
+    defaults: { run: { working-directory: apps/web } }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: "22", cache: npm, cache-dependency-path: apps/web/package-lock.json }
+      - run: npm ci
+      - run: npm run build

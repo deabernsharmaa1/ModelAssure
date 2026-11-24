@@ -8,8 +8,24 @@ from common.errors import ApiError, api_error_handler
 from settings import get_settings
 
 
+def _check_production_safety(s) -> None:
+    """Refuse to start a production deployment with development-only settings."""
+    if s.environment != "production":
+        return
+    problems = []
+    if s.auth_mode != "oidc":
+        problems.append("MA_AUTH_MODE must be 'oidc' in production (dev login is for demos only)")
+    if s.jwt_secret.startswith("change-me"):
+        problems.append("MA_JWT_SECRET still has the development default")
+    if not s.storage_encryption_key and s.storage_backend == "local":
+        problems.append("MA_STORAGE_ENCRYPTION_KEY must be set")
+    if problems:
+        raise RuntimeError("unsafe production configuration: " + "; ".join(problems))
+
+
 def create_app() -> FastAPI:
     s = get_settings()
+    _check_production_safety(s)
     app = FastAPI(
         title="ModelAssure ReleaseGate API",
         version="1.0.0",

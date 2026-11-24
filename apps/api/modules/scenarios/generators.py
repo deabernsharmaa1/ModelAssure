@@ -9,6 +9,7 @@ Every generated case is a dict:
 from __future__ import annotations
 
 import copy
+import re
 from typing import Any, Callable
 
 from common.hashing import content_hash
@@ -21,6 +22,9 @@ FAULT_MODES = ("TIMEOUT", "UNAVAILABLE", "MALFORMED", "MISSING_RESPONSE")
 
 class GenerationError(ValueError):
     pass
+
+
+CASE_KEY_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,99}")
 
 
 def default_scenario(**overrides: Any) -> dict[str, Any]:
@@ -346,6 +350,9 @@ def generate_suite(config: dict[str, Any], policy_sets: list[CompiledPolicySet],
         cat = c["category"]
         counters[cat] = counters.get(cat, 0) + 1
         key = c.get("case_key") or f"{PREFIX.get(cat, 'CAS')}-{counters[cat]:05d}"
+        if not isinstance(key, str) or not CASE_KEY_RE.fullmatch(key):
+            # case keys become part of evidence storage paths: allow a safe character set only
+            raise GenerationError(f"invalid case_key {key!r}: use 1-100 letters, digits, '.', '_' or '-'")
         if key in used:
             raise GenerationError(f"duplicate case key {key}")
         used.add(key)

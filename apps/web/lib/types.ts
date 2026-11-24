@@ -95,8 +95,8 @@ export interface ObservationEvidence {
 }
 export interface ExecutionDetail extends Execution {
   detail: { policy_outcomes: { policy_id: string; status: string; expected: string; observed: unknown; reason: string; severity: Severity }[] } & Record<string, unknown>;
-  evidence: { input: unknown; scenario: Record<string, unknown>; baseline: ObservationEvidence | null; candidate: ObservationEvidence | null; trace_id: string; executed_at: string; schema_versions: Record<string, string> };
-  evidence_integrity: { sha256: string; verified: boolean };
+  evidence: null | { input: unknown; scenario: Record<string, unknown>; baseline: ObservationEvidence | null; candidate: ObservationEvidence | null; trace_id: string; executed_at: string; schema_versions: Record<string, string> };
+  evidence_integrity: { sha256: string; verified: boolean; purged?: boolean };
 }
 
 export interface Finding {

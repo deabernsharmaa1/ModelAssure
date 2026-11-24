@@ -208,3 +208,35 @@ def test_csv_export_contains_only_permitted_outcomes(api, flow):
 
 def test_audit_chain_still_valid_after_full_workflow(api):
     assert api.as_("auditor").get("/v1/audit-events/verify").json()["valid"] is True
+
+
+def test_retention_purge_keeps_outcomes_and_hashes(api, flow, database):
+    """Spec §12.2: raw records have limited retention; outcomes and hashes remain provable."""
+    from datetime import datetime, timedelta, timezone
+
+    from scripts.purge_evidence import purge
+
+    org = flow["run"]["organization_id"]
+    ex = api.as_("analyst").get(f"/v1/runs/{flow['run']['id']}/executions", params={"rule": "POL-001", "limit": 1}).json()["items"][0]
+    assert purge(org, 1, dry_run=True)["evidence_objects"] == 0  # nothing older than a day yet
+    future = (datetime.now(timezone.utc) + timedelta(days=400))
+    import scripts.purge_evidence as pe
+    real_now = pe.datetime
+
+    class Shifted(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return future
+
+    pe.datetime = Shifted
+    try:
+        result = purge(org, 365, url=database["owner_url"])
+    finally:
+        pe.datetime = real_now
+    assert result["evidence_objects"] > 0
+    full = api.as_("analyst").get(f"/v1/runs/{flow['run']['id']}/executions/{ex['id']}").json()
+    assert full["evidence"] is None and full["evidence_integrity"]["purged"] is True
+    assert full["result"] == "FAIL" and full["evidence_hash"] == ex["evidence_hash"]
+    events = api.as_("auditor").get("/v1/audit-events", params={"action": "evidence.purge"}).json()
+    assert events["total"] >= 1
+    assert api.as_("auditor").get("/v1/audit-events/verify").json()["valid"] is True
