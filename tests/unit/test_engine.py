@@ -149,3 +149,10 @@ def test_precedence_fraud_hold_beats_bureau_review():
     assert r.state == PASS
     statuses = {o["policy_id"]: o["status"] for o in r.policy_outcomes}
     assert statuses["POL-001"] == "SUPERSEDED" and statuses["POL-002"] == "SATISFIED"
+
+
+def test_declared_change_never_excuses_a_violation():
+    """Bureau unavailable + DSCR 1.3: the change matches EXP-2026-11-01 but still breaks POL-001."""
+    inp = {**GOOD, "bureau": {"status": "UNAVAILABLE"}, "monthly_cash_available": 13000, "monthly_debt_service": 10000}
+    r = run(inp, b=ok("REVIEW"), c=ok("REFER"))
+    assert r.state == FAIL and r.change_class == "VIOLATION"

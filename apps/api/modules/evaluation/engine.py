@@ -11,6 +11,8 @@ Result-state precedence for one case (highest wins):
                 baseline was unavailable so the comparison cannot be made
   CHANGED       the decision differs from baseline without a confirmed violation. Classified as
                 EXPECTED (explained by an approved change or policy revision) or UNEXPECTED.
+                A changed decision that also violates a policy is FAIL with change class VIOLATION:
+                an approved change never excuses a violation.
   PASS          executed and satisfied every configured assertion with no decision change
 """
 from __future__ import annotations
@@ -76,7 +78,7 @@ class CaseResult:
     baseline_decision: str | None
     candidate_decision: str | None
     changed: bool
-    change_class: str | None = None  # EXPECTED | UNEXPECTED | PROHIBITED
+    change_class: str | None = None  # EXPECTED | UNEXPECTED | PROHIBITED | VIOLATION
     explained_by: list[str] = field(default_factory=list)
     failure_types: list[str] = field(default_factory=list)
     violations: list[dict[str, Any]] = field(default_factory=list)
@@ -280,4 +282,8 @@ def _classify_change(res: CaseResult, ctx: dict, cps: CompiledPolicySet, bps: Co
                     f"{o.policy_id} v{o.version} (approved policy revision)" if revised
                     else f"{o.policy_id} v{o.version} (candidate corrects a baseline violation)"
                 )
-    res.change_class = "EXPECTED" if res.explained_by else "UNEXPECTED"
+    if any(v.get("failure_type") == "POLICY_VIOLATION" for v in res.violations):
+        # A declared/approved change never excuses a policy violation.
+        res.change_class = "VIOLATION"
+    else:
+        res.change_class = "EXPECTED" if res.explained_by else "UNEXPECTED"

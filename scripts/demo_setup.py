@@ -49,3 +49,38 @@ def register_bank(as_: Callable[[str], Any], sim: dict[str, str], system_name: s
         "risk_classification": "HIGH", "test_environment": "Fictional bank sandbox (simulator)",
     }))
     return {"system": system, "versions": versions, "connections": connections, "project": project, "users": users}
+
+
+POLICY_SET_NAME = "Tanjung SME lending policy"
+
+
+def approve_policy_sets(as_: Callable[[str], Any], project_id: str) -> dict[str, Any]:
+    """Risk Manager authors both policy versions; a Reviewer approves each (four-eyes)."""
+    risk, reviewer = as_("risk"), as_("reviewer")
+    out = {}
+    parent = None
+    for label, fname in (("2026-06", "policy_set_2026-06.json"), ("2026-11", "policy_set_2026-11.json")):
+        content = json.loads((FIX / fname).read_text())
+        ps = _ok(risk.post("/v1/policy-sets", json={"project_id": project_id, "name": POLICY_SET_NAME,
+                                                    "content": content, "parent_id": parent}))
+        _ok(risk.post(f"/v1/policy-sets/{ps['id']}/submit", json={"note": f"Policy {label} for approval"}))
+        out[label] = _ok(reviewer.post(f"/v1/policy-sets/{ps['id']}/approve", json={"note": "Approved by Credit Committee delegate"}))
+        parent = ps["id"]
+    return out
+
+
+def create_standard_suite(as_: Callable[[str], Any], project_id: str, policy_set_ids: list[str], name: str = "SME lending — standard release suite") -> dict[str, Any]:
+    cfg = json.loads((ROOT / "test_suites/lending/standard_release_suite.json").read_text())
+    return _ok(as_("analyst").post("/v1/test-suites", json={
+        "project_id": project_id, "name": name, "description": cfg.get("description"),
+        "config": {"seed": cfg["seed"], "generators": cfg["generators"]}, "policy_set_ids": policy_set_ids}))
+
+
+def queue_run(as_: Callable[[str], Any], bank: dict[str, Any], policies: dict[str, Any], suite: dict[str, Any],
+              candidate: str = "3.2.0", idempotency_key: str | None = None, **extra) -> dict[str, Any]:
+    headers = {"Idempotency-Key": idempotency_key} if idempotency_key else {}
+    return _ok(as_("analyst").post("/v1/runs", json={
+        "project_id": bank["project"]["id"], "test_suite_id": suite["id"],
+        "baseline_version_id": bank["versions"]["3.1.0"]["id"], "candidate_version_id": bank["versions"][candidate]["id"],
+        "policy_set_id": policies["2026-11"]["id"], "baseline_policy_set_id": policies["2026-06"]["id"],
+        "mode": "SANDBOX", **extra}, headers=headers))
