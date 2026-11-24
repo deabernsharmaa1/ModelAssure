@@ -21,7 +21,12 @@ DEPENDENCY_URL=http://127.0.0.1:8200 DEPENDENCY_TIMEOUT_S=0.3 start baseline pyt
 DEPENDENCY_URL=http://127.0.0.1:8200 DEPENDENCY_TIMEOUT_S=0.3 start candidate python3 -m uvicorn decision_simulator.candidate_api.app:app --port 8102
 start api python3 -m uvicorn main:app --app-dir apps/api --port 8000
 start worker python3 -m workers.executor.main
-if [ ! -d apps/web/.next ]; then (cd apps/web && npm run build); fi
+# Rebuild the web app when there is no build yet or any web source changed since the last one
+# (e.g. after `git pull`); otherwise an old build would keep serving outdated screens.
+if [ ! -f apps/web/.next/BUILD_ID ] || [ -n "$(find apps/web/app apps/web/components apps/web/lib apps/web/package.json -newer apps/web/.next/BUILD_ID -print -quit)" ]; then
+  echo "Building the web app (takes a minute)…"
+  (cd apps/web && NEXT_PUBLIC_API_URL=http://localhost:8000 npm run build > "$ROOT/var/logs/web-build.log" 2>&1) || { echo "Web build failed: see var/logs/web-build.log"; exit 1; }
+fi
 (cd apps/web && NEXT_PUBLIC_API_URL=http://localhost:8000 "${DETACH[@]}" npx next start -p 3000 < /dev/null > "$ROOT/var/logs/web.log" 2>&1 & echo $! > "$ROOT/var/logs/web.pid")
 # Wait for the API (the first start on a new machine can take a while)
 for _ in $(seq 1 30); do curl -fsS localhost:8000/health >/dev/null 2>&1 && break; sleep 1; done
