@@ -15,7 +15,7 @@ from common.deps import get_or_404, row, tenant_db
 from common.errors import conflict, not_found
 from common.hashing import content_hash, sha256_hex
 from common.storage import get_storage
-from db.models import TestExecution, TestRun
+from db.models import Review, TestExecution, TestRun
 from modules.audit.service import record_for
 from modules.identity.auth import Principal, require
 from modules.runner.service import create_run, idempotency_lookup, idempotency_store
@@ -70,17 +70,30 @@ def queue_run(body: RunIn, p: Principal = Depends(require("run.create")), db: Se
     return JSONResponse(resp, status_code=201)
 
 
+def _with_reviews(db: Session, views: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    ids = [uuid.UUID(v["id"]) for v in views]
+    latest: dict[str, tuple[int, str]] = {}
+    for run_id, decision, n in db.execute(
+            select(Review.run_id, Review.decision, func.count().over(partition_by=Review.run_id))
+            .where(Review.run_id.in_(ids)).order_by(Review.run_id, Review.created_at)):
+        latest[str(run_id)] = (n, decision)
+    for v in views:
+        n, decision = latest.get(v["id"], (0, None))
+        v["review_count"], v["last_review_decision"] = n, decision
+    return views
+
+
 @router.get("/runs")
 def list_runs(project_id: uuid.UUID | None = None, p: Principal = Depends(require("project.read")), db: Session = Depends(tenant_db)):
     q = select(TestRun).order_by(TestRun.created_at.desc())
     if project_id:
         q = q.where(TestRun.project_id == project_id)
-    return [run_view(r) for r in db.scalars(q.limit(200))]
+    return _with_reviews(db, [run_view(r) for r in db.scalars(q.limit(200))])
 
 
 @router.get("/runs/{run_id}")
 def get_run(run_id: str, p: Principal = Depends(require("project.read")), db: Session = Depends(tenant_db)):
-    return run_view(get_or_404(db, TestRun, run_id, "run"))
+    return _with_reviews(db, [run_view(get_or_404(db, TestRun, run_id, "run"))])[0]
 
 
 @router.get("/runs/{run_id}/config")
