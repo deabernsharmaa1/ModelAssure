@@ -61,6 +61,7 @@ export function Shell({ children }: { children: ReactNode }) {
           <NavLink href="/" exact>Dashboard</NavLink>
           {has(...CAN.createProject) && <NavLink href="/projects/new">New project</NavLink>}
           {has(...CAN.audit) && <NavLink href="/audit">Audit trail</NavLink>}
+          {has(...CAN.manageKeys) && <NavLink href="/api-keys">Pipeline keys</NavLink>}
         </nav>
         {params?.id && params.id !== "new" && <ProjectNav id={params.id} />}
         <div className="mt-auto border-t border-white/10 px-3 pt-3 text-xs text-slate-300">

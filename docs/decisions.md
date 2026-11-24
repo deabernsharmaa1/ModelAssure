@@ -131,9 +131,20 @@ vendor updates were tested, more than running tests. Four additions follow from 
   - Packs leave the organisation, so they are issued by Risk Managers, Reviewers, Auditors and
     Admins, not by the Engineers and Analysts who build and test the system.
 
+- **Release gate for CI/CD** (`modules/gate/`, [release-gate.md](release-gate.md)). Design choices:
+  - A pipeline key has its own service identity with a `CI` role that holds only the gate
+    permissions, is scoped to one project, expires, and stores only a SHA-256 of its secret.
+  - Authentication must find a key before the organisation is known. A `SECURITY DEFINER`
+    function returns the one row for a key id, so the table keeps row-level security for the
+    application role. Key identity is immutable and keys are revoked, never deleted.
+  - Segregation of duties follows the key to the admin who created it.
+  - The gate reuses the setup of the project's latest completed full run, and verifies the new
+    endpoint before running. It never changes the project's own candidate selection.
+  - A PASS never approves a release. Exit codes: 0 PASS, 1 FAIL, 2 INCONCLUSIVE, 3 error.
+
 ## Not in Version 1 (per spec §1.4 and §16)
 
 Model training, credit-bureau integrations, real-time fraud prevention, insurance, AI-agent
 governance, Web3; customer-hosted runner, Python model packages, vendor adapters; calibration,
-fairness and drift (Phase 2); GenAI prompt attacks (Phase 3); CI/CD pipeline gating and production
-monitoring (later).
+fairness and drift (Phase 2); GenAI prompt attacks (Phase 3); production monitoring (later). CI/CD pipeline gating (BR-10) was
+brought forward: see section 11 and [release-gate.md](release-gate.md).

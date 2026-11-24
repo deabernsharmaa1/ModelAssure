@@ -68,7 +68,7 @@ with sync_playwright() as p:
     rv.get_by_role("button", name="Record decision").click(); rv.wait_for_timeout(1200)
     expect(rv.get_by_text("APPROVE RELEASE").first).to_be_visible()
     rv.get_by_role("button", name="Generate new version").click()
-    expect(rv.get_by_text("Version 1")).to_be_visible(timeout=20000)
+    expect(rv.get_by_text("Version 1", exact=True)).to_be_visible(timeout=20000)
     with rv.expect_download() as dl:
         rv.get_by_role("button", name="PDF").click()
     path = dl.value.path(); data = open(path, "rb").read(5)

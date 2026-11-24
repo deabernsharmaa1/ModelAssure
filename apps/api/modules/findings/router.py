@@ -236,15 +236,17 @@ class ReviewIn(BaseModel):
 
 def _conflicts_of_interest(db: Session, run: TestRun, p: Principal) -> list[str]:
     """Spec §12.2: people who develop a system cannot approve its release."""
+    from modules.gate.keys import accountable  # a pipeline key's creator answers for what the key did
+
     reasons = []
     cand = db.get(SystemVersion, run.candidate_version_id)
-    if cand and cand.registered_by == p.user_id:
+    if cand and p.user_id in accountable(db, cand.registered_by):
         reasons.append("registered the candidate version")
     conn_id = run.config_snapshot["connections"]["candidate"]["connection_id"]
     conn = db.get(Connection, uuid.UUID(conn_id))
-    if conn and conn.created_by == p.user_id:
+    if conn and p.user_id in accountable(db, conn.created_by):
         reasons.append("configured the candidate connection")
-    if run.created_by == p.user_id:
+    if p.user_id in accountable(db, run.created_by):
         reasons.append("initiated the test run")
     return reasons
 

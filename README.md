@@ -112,7 +112,7 @@ Password for all: `ModelAssure!2026`
 ## Tests
 
 ```bash
-pytest                                # 198 tests: unit, contract, integration, security, end-to-end
+pytest                                # 209 tests: unit, contract, integration, security, end-to-end
 python scripts/ui_smoke.py            # browser workflow (needs the running stack, Chrome, Playwright)
 (cd apps/web && npm run build)        # type-checks and builds the frontend
 ```
@@ -157,12 +157,17 @@ Added after market research (see [decisions](docs/decisions.md#11-additions-afte
   `verify_pack.py` is inside every pack. Get the fingerprint from the issuer separately
   (`GET /v1/signing-keys`, or the release screen).
 
+- **Release gate for CI/CD**: a pipeline key and `scripts/modelassure_gate.py` run the release suite
+  against each new build and fail the pipeline on FAIL or INCONCLUSIVE (exit codes 0/1/2/3). A
+  PASS sends the build to human review; it never approves it. See [release-gate.md](docs/release-gate.md).
+
 ## Documentation
 
 - [Architecture](docs/architecture.md): components, data flow, security model
 - [Policy language](docs/policy-language.md): how to write policies, change controls and approved changes
 - [Decisions and deviations from the spec](docs/decisions.md): what was changed and why
 - [Spec traceability](docs/spec-traceability.md): requirement → implementation → test
+- [Release gate](docs/release-gate.md): CI/CD integration, pipeline keys, GitHub Actions example
 
 ## Production readiness
 

@@ -44,6 +44,7 @@ class Settings(BaseSettings):
     worker_poll_seconds: float = 1.0
 
     cors_origins: str = "http://localhost:3000"
+    web_url: str = "http://localhost:3000"  # used for links returned to pipelines
 
     @property
     def allowed_hosts(self) -> set[str]:

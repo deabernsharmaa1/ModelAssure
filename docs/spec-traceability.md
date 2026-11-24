@@ -75,6 +75,7 @@ Built after market research, to shorten onboarding and support buyers' superviso
 | Consumer credit / BNPL generator profile | `modules/scenarios/generators.py` (`ConsumerCreditProfile`) | `unit/test_onboarding.py` |
 | Mapping helper from sample payloads | `modules/connectors/suggest.py` | `unit/test_onboarding.py`, `integration/test_onboarding_api.py` |
 | Project setup checklist | `GET /v1/projects/{id}/setup`, project screen | `integration/test_onboarding_api.py` |
+| Release gate for CI/CD (BR-10, brought forward) | `modules/gate/`, `scripts/modelassure_gate.py`, *Pipeline keys* screen | `end_to_end/test_release_gate.py` (exit codes via the CLI against a live API, key scope, revocation, segregation of duties, idempotency, DB immutability) |
 | Signed evidence packs + offline verifier | `modules/evidence/`, release screen | `end_to_end/test_evidence_pack.py` (incl. tampering, forged signer, key rotation, tenancy, DB immutability) |
 
 There is no consumer-credit simulator: the consumer profile and template are tested at unit and

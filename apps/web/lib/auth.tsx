@@ -57,4 +57,5 @@ export const CAN = {
   review: ["REVIEWER"] as Role[],
   audit: ["AUDITOR", "ADMIN", "RISK_MANAGER"] as Role[],
   evidencePack: ["ADMIN", "RISK_MANAGER", "REVIEWER", "AUDITOR"] as Role[],
+  manageKeys: ["ADMIN"] as Role[],
 };

@@ -359,6 +359,25 @@ class SigningKey(Base):
     retired_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
+class ApiKey(Base):
+    """Pipeline (CI/CD) key. Each key has its own service identity, may only use the release gate,
+    and is scoped to one project. Only a SHA-256 of the secret is stored; the key is shown once."""
+    __tablename__ = "api_keys"
+    id: Mapped[uuid.UUID] = pk()
+    organization_id: Mapped[uuid.UUID] = org_fk()
+    key_id: Mapped[str] = mapped_column(String(16), nullable=False, unique=True)
+    name: Mapped[str] = mapped_column(String(100), nullable=False)
+    secret_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    service_user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    project_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("projects.id"), nullable=False)
+    created_by: Mapped[uuid.UUID | None] = user_fk()
+    created_at: Mapped[datetime] = created()
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    last_used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    revoked_by: Mapped[uuid.UUID | None] = user_fk()
+
+
 class AuditEvent(Base):
     __tablename__ = "audit_events"
     __table_args__ = (UniqueConstraint("organization_id", "seq"),)
@@ -408,5 +427,5 @@ class IdempotencyKey(Base):
 TENANT_TABLES = [
     "systems", "system_versions", "projects", "connections", "datasets", "policy_sets", "policies",
     "test_suites", "test_cases", "test_runs", "test_executions", "findings", "finding_executions",
-    "reviews", "artifacts", "audit_events", "idempotency_keys", "signing_keys",
+    "reviews", "artifacts", "audit_events", "idempotency_keys", "signing_keys", "api_keys",
 ]

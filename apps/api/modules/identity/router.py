@@ -12,7 +12,7 @@ from common.errors import ApiError
 from db.models import Membership, Organization, User
 from db.session import new_session
 from modules.audit.service import record
-from modules.identity.auth import Principal, issue_dev_token, require, verify_password, current_principal
+from modules.identity.auth import CI_ROLE, Principal, current_principal, issue_dev_token, require, verify_password
 from settings import get_settings
 
 router = APIRouter(prefix="/v1", tags=["identity"])
@@ -68,7 +68,7 @@ def list_users(p: Principal = Depends(require("user.read")), db: Session = Depen
     rows = db.execute(
         select(User.id, User.email, User.name, Membership.role)
         .join(Membership, Membership.user_id == User.id)
-        .where(Membership.organization_id == p.org_id)
+        .where(Membership.organization_id == p.org_id, Membership.role != CI_ROLE)  # pipeline identities are listed under API keys
         .order_by(User.name)
     )
     users: dict[str, dict] = {}

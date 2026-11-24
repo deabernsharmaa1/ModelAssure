@@ -13,13 +13,14 @@ from __future__ import annotations
 import hashlib
 import hmac
 import os
+import re
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 
 import jwt
 from fastapi import Depends, Header, Request
-from sqlalchemy import select
+from sqlalchemy import select, text
 
 from common.errors import ApiError
 from db.models import Membership, User
@@ -27,6 +28,7 @@ from db.session import new_session
 from settings import get_settings
 
 ROLES = ("ADMIN", "RISK_MANAGER", "ENGINEER", "ANALYST", "REVIEWER", "AUDITOR")
+CI_ROLE = "CI"  # service identity of a pipeline API key; deliberately not in ROLES
 
 # Least-privilege permission matrix.
 PERMISSIONS: dict[str, set[str]] = {
@@ -49,6 +51,10 @@ PERMISSIONS: dict[str, set[str]] = {
     # Packs leave the organisation, so the people who build the system do not issue them.
     "evidence_pack.create": {"ADMIN", "RISK_MANAGER", "REVIEWER", "AUDITOR"},
     "signing_key.manage": {"ADMIN"},
+    # Release gate. CI is the role of a pipeline key's service identity and holds nothing else.
+    "gate.run": {CI_ROLE, "ADMIN", "ENGINEER"},
+    "gate.read": {CI_ROLE, *ROLES},
+    "api_key.manage": {"ADMIN"},
     "user.read": set(ROLES),
 }
 PRIVILEGED = {"policy.approve", "finding.accept_risk", "release.review", "finding.close"}
@@ -62,6 +68,8 @@ class Principal:
     org_id: uuid.UUID
     roles: set[str] = field(default_factory=set)
     mfa: bool = False
+    api_key_id: uuid.UUID | None = None      # set when authenticated with a pipeline key
+    scope_project_id: uuid.UUID | None = None  # a pipeline key may act on this project only
 
     def can(self, permission: str) -> bool:
         return bool(self.roles & PERMISSIONS[permission])
@@ -133,11 +141,40 @@ def load_principal(token: str, org_header: str | None) -> Principal:
     return Principal(user.id, user.email, user.name, org_id, roles, mfa="mfa" in (claims.get("amr") or []))
 
 
+API_KEY_PREFIX = "mak_"
+
+
+def load_api_key_principal(token: str) -> Principal:
+    """`mak_<key id>_<secret>`. Only a SHA-256 of the secret is stored."""
+    parts = token.split("_", 2)  # the secret itself may contain underscores
+    if len(parts) != 3 or not re.fullmatch(r"[0-9a-f]{12}", parts[1]) or len(parts[2]) < 32:
+        raise ApiError(401, "UNAUTHENTICATED", "malformed API key")
+    with new_session() as db:
+        k = db.execute(text("SELECT * FROM ma_lookup_api_key(:k)"), {"k": parts[1]}).mappings().first()
+    if k is None or not hmac.compare_digest(hashlib.sha256(parts[2].encode()).hexdigest(), k["secret_hash"]):
+        raise ApiError(401, "UNAUTHENTICATED", "invalid API key")
+    now = datetime.now(timezone.utc)
+    if k["revoked_at"] is not None:
+        raise ApiError(401, "UNAUTHENTICATED", "API key has been revoked")
+    if k["expires_at"] <= now:
+        raise ApiError(401, "UNAUTHENTICATED", "API key has expired")
+    with new_session(k["organization_id"], k["service_user_id"]) as db:
+        user = db.get(User, k["service_user_id"])
+        if user is None or not user.is_active:
+            raise ApiError(401, "UNAUTHENTICATED", "API key identity is inactive")
+        db.execute(text("UPDATE api_keys SET last_used_at = now() WHERE id = :i AND "
+                        "(last_used_at IS NULL OR last_used_at < now() - interval '1 minute')"), {"i": k["id"]})
+        db.commit()
+        return Principal(user.id, user.email, user.name, k["organization_id"], {CI_ROLE},
+                         api_key_id=k["id"], scope_project_id=k["project_id"])
+
+
 def current_principal(request: Request, authorization: str = Header(default=""),
                       x_organization_id: str | None = Header(default=None)) -> Principal:
     if not authorization.lower().startswith("bearer "):
         raise ApiError(401, "UNAUTHENTICATED", "missing bearer token")
-    p = load_principal(authorization[7:].strip(), x_organization_id)
+    token = authorization[7:].strip()
+    p = load_api_key_principal(token) if token.startswith(API_KEY_PREFIX) else load_principal(token, x_organization_id)
     request.state.principal = p
     return p
 
