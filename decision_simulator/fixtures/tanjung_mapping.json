@@ -1,0 +1,49 @@
+{
+  "request": {
+    "fields": {
+      "applicationId": "case_id",
+      "productCode": "product",
+      "requestedAmount": "requested_amount",
+      "currency": "currency",
+      "monthlyCashAvailable": "monthly_cash_available",
+      "monthlyDebtService": "monthly_debt_service",
+      "bureau.status": "bureau.status",
+      "bureau.score": "bureau.score",
+      "fraud.status": "fraud.status",
+      "fraud.alertResolved": "fraud.alert_resolved",
+      "identity.status": "identity.status"
+    }
+  },
+  "response": {
+    "fields": {
+      "case_id": {
+        "source": "applicationId"
+      },
+      "decision": {
+        "source": "finalStatus",
+        "values": {
+          "APPROVED": "APPROVE",
+          "DECLINED": "DECLINE",
+          "MANUAL_REVIEW": "REVIEW",
+          "ON_HOLD": "HOLD",
+          "REFERRED": "REFER"
+        }
+      },
+      "pd": {
+        "source": "probabilityOfDefault"
+      },
+      "model_version": {
+        "source": "modelVersion"
+      },
+      "policy_version": {
+        "source": "policyVersion"
+      },
+      "reason_codes": {
+        "source": "reasonCodes"
+      },
+      "trace_id": {
+        "source": "traceId"
+      }
+    }
+  }
+}

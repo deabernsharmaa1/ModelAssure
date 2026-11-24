@@ -1,0 +1,6 @@
+{
+  "name": "Credit/fraud conflict suite",
+  "description": "Focused suite for contradictory credit and fraud outputs.",
+  "seed": 1,
+  "generators": [{"type": "cross_system_conflict"}, {"type": "duplicate", "repeat": 3}]
+}

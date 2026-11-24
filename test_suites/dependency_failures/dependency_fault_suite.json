@@ -1,0 +1,6 @@
+{
+  "name": "Dependency failure suite",
+  "description": "Bureau, fraud and identity provider timeouts, outages, malformed and empty responses injected through the dependency simulator.",
+  "seed": 1,
+  "generators": [{"type": "dependency_failure"}, {"type": "missing_data"}]
+}
